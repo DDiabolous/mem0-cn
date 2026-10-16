@@ -59,8 +59,9 @@ SENSITIVE_CONFIG_KEYS = {
 SKIPPED_REQUEST_LOG_PATHS = {"/api/health", "/docs", "/redoc", "/openapi.json"}
 SKIPPED_REQUEST_LOG_PREFIXES = ("/requests",)
 
-BUNDLED_LLM_PROVIDERS = ("openai", "anthropic", "gemini")
-BUNDLED_EMBEDDER_PROVIDERS = ("openai", "gemini")
+BUNDLED_LLM_PROVIDERS = ("openai", "anthropic", "gemini", "dashscope")
+BUNDLED_EMBEDDER_PROVIDERS = ("openai", "gemini", "dashscope")
+BUNDLED_RERANKER_PROVIDERS = ("dashscope", "llm_reranker")
 
 
 def _warn_if_unconfigured() -> None:
@@ -114,8 +115,18 @@ POSTGRES_COLLECTION_NAME = os.environ.get("POSTGRES_COLLECTION_NAME", "memories"
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 HISTORY_DB_PATH = os.environ.get("HISTORY_DB_PATH", "/app/history/history.db")
-DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gpt-5-mini")
-DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "text-embedding-3-small")
+DEFAULT_LLM_PROVIDER = os.getenv("MEM0_DEFAULT_LLM_PROVIDER") or (
+    "dashscope" if os.getenv("DASHSCOPE_API_KEY") else "openai"
+)
+DEFAULT_EMBEDDER_PROVIDER = os.getenv("MEM0_DEFAULT_EMBEDDER_PROVIDER") or (
+    "dashscope" if os.getenv("DASHSCOPE_API_KEY") else "openai"
+)
+DEFAULT_LLM_MODEL = os.getenv("MEM0_DEFAULT_LLM_MODEL") or (
+    "qwen3.6-flash" if DEFAULT_LLM_PROVIDER == "dashscope" else "gpt-5-mini"
+)
+DEFAULT_EMBEDDER_MODEL = os.getenv("MEM0_DEFAULT_EMBEDDER_MODEL") or (
+    "qwen3.7-text-embedding-flash" if DEFAULT_EMBEDDER_PROVIDER == "dashscope" else "text-embedding-3-small"
+)
 
 DEFAULT_CONFIG = {
     "version": "v1.1",
@@ -128,15 +139,27 @@ DEFAULT_CONFIG = {
             "user": POSTGRES_USER,
             "password": POSTGRES_PASSWORD,
             "collection_name": POSTGRES_COLLECTION_NAME,
+            "embedding_model_dims": 1024,
         },
     },
     "llm": {
-        "provider": "openai",
-        "config": {"api_key": OPENAI_API_KEY, "temperature": 0.2, "model": DEFAULT_LLM_MODEL},
+        "provider": DEFAULT_LLM_PROVIDER,
+        "config": {"temperature": 0.2, "model": DEFAULT_LLM_MODEL},
     },
-    "embedder": {"provider": "openai", "config": {"api_key": OPENAI_API_KEY, "model": DEFAULT_EMBEDDER_MODEL}},
+    "embedder": {
+        "provider": DEFAULT_EMBEDDER_PROVIDER,
+        "config": {"model": DEFAULT_EMBEDDER_MODEL, "embedding_dims": 1024},
+    },
     "history_db_path": HISTORY_DB_PATH,
 }
+
+if os.getenv("MEM0_RERANK_ENABLED", "false").lower() == "true":
+    DEFAULT_CONFIG["reranker"] = {
+        "provider": "dashscope",
+        "config": {
+            "model": os.getenv("MEM0_RERANK_MODEL", "qwen3.7-text-rerank"),
+        },
+    }
 
 
 set_session_factory(SessionLocal)
@@ -205,6 +228,8 @@ class SearchRequest(BaseModel):
     threshold: Optional[float] = Field(None, description="Minimum similarity score for results.")
     explain: Optional[bool] = Field(None, description="Include score details for each search result.")
     show_expired: Optional[bool] = Field(None, description="Include expired memories.")
+    rerank: bool = Field(False, description="Rerank with the configured reranker.")
+    candidate_k: Optional[int] = Field(None, ge=1, le=100, description="Candidates before reranking; requires rerank=true.")
 
 
 class GenerateInstructionsRequest(BaseModel):
@@ -241,6 +266,10 @@ def _validate_bundled_providers(config: Dict[str, Any]) -> None:
                 "and extend BUNDLED_LLM_PROVIDERS in server/main.py."
             ),
         )
+
+    reranker = config.get("reranker")
+    if isinstance(reranker, dict) and (provider := reranker.get("provider")) and provider not in BUNDLED_RERANKER_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Reranker provider '{provider}' is not bundled in this image.")
 
     embedder = config.get("embedder")
     if (
@@ -324,16 +353,26 @@ def get_config(_auth=Depends(verify_auth)):
     return _redact_config(get_current_config())
 
 
-@app.get("/configure/providers", summary="List bundled LLM and embedder providers")
+@app.get("/configure/providers", summary="List bundled LLM, embedder, and reranker providers")
 def list_bundled_providers(_auth=Depends(verify_auth)):
-    return {"llm": list(BUNDLED_LLM_PROVIDERS), "embedder": list(BUNDLED_EMBEDDER_PROVIDERS)}
+    return {
+        "llm": list(BUNDLED_LLM_PROVIDERS),
+        "embedder": list(BUNDLED_EMBEDDER_PROVIDERS),
+        "reranker": list(BUNDLED_RERANKER_PROVIDERS),
+    }
 
 
 @app.post("/configure", summary="Configure Mem0")
 def set_config(config: Dict[str, Any], _auth=Depends(require_admin)):
     """Set memory configuration. Requires admin role."""
     _validate_bundled_providers(config)
-    update_config(config)
+    try:
+        update_config(config)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid model configuration. Check the provider, model, base URL, and server credentials.",
+        ) from None
     return {"message": "Configuration set successfully"}
 
 
@@ -469,13 +508,28 @@ def search_memories(search_req: SearchRequest, _auth=Depends(verify_auth)):
         params = {}
         if search_req.top_k is not None:
             params["top_k"] = search_req.top_k
+        if search_req.candidate_k is not None and not search_req.rerank:
+            raise HTTPException(status_code=400, detail="candidate_k requires rerank=true")
+        if search_req.rerank:
+            if not get_memory_instance().reranker:
+                raise HTTPException(status_code=400, detail="No reranker configured")
+            final_top_k = search_req.top_k if search_req.top_k is not None else 20
+            if final_top_k < 1:
+                raise HTTPException(status_code=400, detail="top_k must be positive for reranking")
+            if search_req.candidate_k is not None and search_req.candidate_k < final_top_k:
+                raise HTTPException(status_code=400, detail="candidate_k must be at least top_k")
+            params["top_k"] = search_req.candidate_k or final_top_k
+            params["rerank"] = True
         if search_req.threshold is not None:
             params["threshold"] = search_req.threshold
         if search_req.explain is not None:
             params["explain"] = search_req.explain
         if search_req.show_expired is not None:
             params["show_expired"] = search_req.show_expired
-        return get_memory_instance().search(query=search_req.query, filters=filters, **params)
+        result = get_memory_instance().search(query=search_req.query, filters=filters, **params)
+        if search_req.rerank:
+            result["results"] = result["results"][:final_top_k]
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:

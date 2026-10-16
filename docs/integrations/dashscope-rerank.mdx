@@ -1,0 +1,120 @@
+---
+title: "DashScope Models and Reranking"
+description: "Use one DashScope key and base URL for Qwen chat, embeddings, and reranking in Mem0."
+---
+
+The `dashscope` provider supports Qwen chat, text embeddings, and native text
+reranking. Set two shared environment variables:
+
+```dotenv
+DASHSCOPE_API_KEY=your-dashscope-api-key
+DASHSCOPE_BASE_URL=https://YOUR_WORKSPACE.cn-beijing.maas.aliyuncs.com/api/v1
+```
+
+Use the URL and key for the same workspace and region. The URL can end in
+`/api/v1`, `/compatible-mode/v1`, or the host root. The provider automatically uses
+`/compatible-mode/v1` for chat/embeddings and `/api/v1` for native reranking.
+It does not require the `dashscope` Python package.
+
+## Python configuration
+
+```python
+from mem0 import Memory
+
+# Merge these sections into your existing vector store configuration.
+config = {
+    "llm": {
+        "provider": "dashscope",
+        "config": {"model": "qwen3.6-flash", "temperature": 0.1},
+    },
+    "embedder": {
+        "provider": "dashscope",
+        "config": {"model": "qwen3.7-text-embedding-flash", "embedding_dims": 1024},
+    },
+    "reranker": {
+        "provider": "dashscope",
+        "config": {"model": "qwen3.7-text-rerank", "timeout": 15},
+    },
+}
+memory = Memory.from_config(config)
+results = memory.search(
+    "What movies does the user enjoy?",
+    filters={"user_id": "user-001", "agent_id": "device-001"},
+    top_k=20,
+    rerank=True,
+)
+```
+
+Each provider also accepts `api_key` and `base_url` overrides. Chat and embedding
+providers use only DashScope credentials, independently of OpenAI/OpenRouter
+variables. Chat defaults to non-thinking mode (`enable_thinking=False`) for
+structured memory extraction. Embedding batches are split into groups of ten,
+including when using text-embedding-v3/v4. Match the configured dimensions to your
+vector table; changing an embedding model may require re-embedding old memories.
+
+The reranker accepts optional `instruct` text. Returned memories preserve IDs,
+metadata, and original retrieval scores, with an additional `rerank_score`.
+Timeouts, HTTP errors, and invalid responses fall back to retrieval order with a
+warning. For compatibility with older reranker-only deployments, reranking still
+accepts `DASHSCOPE_RERANK_BASE_URL` and falls back to `OPENAI_API_KEY` when no
+DashScope key is set. Prefer the shared variables for new deployments.
+
+## Self-hosted server and dashboard
+
+When `DASHSCOPE_API_KEY` is set, the server defaults to `dashscope` for chat and
+embeddings. You can explicitly select defaults with:
+
+```dotenv
+MEM0_DEFAULT_LLM_PROVIDER=dashscope
+MEM0_DEFAULT_EMBEDDER_PROVIDER=dashscope
+MEM0_DEFAULT_LLM_MODEL=qwen3.6-flash
+MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
+MEM0_RERANK_ENABLED=true
+MEM0_RERANK_MODEL=qwen3.7-text-rerank
+```
+
+Rebuild the API and dashboard after updating code:
+
+```bash
+cd server
+docker compose build mem0 mem0-dashboard
+docker compose up -d --force-recreate mem0 mem0-dashboard
+```
+
+In the dashboard's **Configuration** page:
+
+1. Select `dashscope` for the LLM and embedding providers.
+2. In **Reranking Model**, select `dashscope` and enter `qwen3.7-text-rerank`.
+3. Leave API Key blank to preserve an existing override or use the shared environment key.
+4. The dashboard uses the server's `DASHSCOPE_BASE_URL`; no Base URL input is needed.
+5. Save Configuration. Select **Disabled** to turn off the configured reranker.
+
+Configuration persists in the application database and overrides environment
+defaults on restart. On existing deployments, select `dashscope` and save once to
+replace previously saved `openai` providers. Switching providers drops incompatible
+options and old credentials; partial updates within the same provider preserve
+saved options and keys. Invalid provider configurations do not replace the running
+configuration. API responses redact API keys.
+
+Setting up a reranker does not automatically enable it on every search. Send this
+body to `POST /search`:
+
+```json
+{
+  "query": "What movies does the user enjoy?",
+  "filters": {"user_id": "user-001", "agent_id": "device-001"},
+  "rerank": true,
+  "candidate_k": 20,
+  "top_k": 5
+}
+```
+
+`candidate_k` sets retrieval depth (1–100), while `top_k` limits final results.
+Candidates must be at least `top_k`. If omitted, candidate count equals `top_k`
+(default 20). `candidate_k` requires `rerank=true`; a missing configured reranker
+returns HTTP 400. With `rerank=false`, omit `candidate_k` and use `top_k` directly.
+
+`threshold` applies to retrieval scores before reranking, not `rerank_score`.
+Reranking cannot recover candidates excluded by filtering or retrieval limits.
+It adds model usage and latency. Compare relevance and latency on real queries
+before enabling it for every search.

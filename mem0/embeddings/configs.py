@@ -14,6 +14,7 @@ class EmbedderConfig(BaseModel):
     def validate_config(cls, v, values):
         provider = values.data.get("provider")
         if provider in [
+            "dashscope",
             "openai",
             "ollama",
             "huggingface",

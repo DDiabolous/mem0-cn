@@ -3,11 +3,13 @@ import inspect
 from typing import Dict, Optional, Union
 
 from mem0.configs.embeddings.base import BaseEmbedderConfig
+from mem0.configs.embeddings.dashscope import DashScopeEmbedderConfig
 from mem0.configs.llms.anthropic import AnthropicConfig
 from mem0.configs.llms.aws_bedrock import AWSBedrockConfig
 from mem0.configs.llms.azure import AzureOpenAIConfig
 from mem0.configs.llms.base import BaseLlmConfig
 from mem0.configs.llms.deepseek import DeepSeekConfig
+from mem0.configs.llms.dashscope import DashScopeConfig
 from mem0.configs.llms.gemini import GeminiConfig
 from mem0.configs.llms.lmstudio import LMStudioConfig
 from mem0.configs.llms.minimax import MinimaxConfig
@@ -17,6 +19,7 @@ from mem0.configs.llms.vllm import VllmConfig
 from mem0.configs.llms.xai import XAIConfig
 from mem0.configs.rerankers.base import BaseRerankerConfig
 from mem0.configs.rerankers.cohere import CohereRerankerConfig
+from mem0.configs.rerankers.dashscope import DashScopeRerankerConfig
 from mem0.configs.rerankers.huggingface import HuggingFaceRerankerConfig
 from mem0.configs.rerankers.llm import LLMRerankerConfig
 from mem0.configs.rerankers.sentence_transformer import (
@@ -40,6 +43,7 @@ class LlmFactory:
 
     # Provider mappings with their config classes
     provider_to_class = {
+        "dashscope": ("mem0.llms.dashscope.DashScopeLLM", DashScopeConfig),
         "ollama": ("mem0.llms.ollama.OllamaLLM", OllamaConfig),
         "openai": ("mem0.llms.openai.OpenAILLM", OpenAIConfig),
         "groq": ("mem0.llms.groq.GroqLLM", BaseLlmConfig),
@@ -90,6 +94,9 @@ class LlmFactory:
             # Merge dict config with kwargs
             config = {**config, **kwargs}
             config = config_class(**config)
+        elif isinstance(config, config_class):
+            # Preserve provider-specific options on an already-typed configuration.
+            pass
         elif isinstance(config, BaseLlmConfig):
             # Convert base config to provider-specific config if needed
             if config_class != BaseLlmConfig:
@@ -151,6 +158,7 @@ class LlmFactory:
 
 class EmbedderFactory:
     provider_to_class = {
+        "dashscope": "mem0.embeddings.dashscope.DashScopeEmbedding",
         "openai": "mem0.embeddings.openai.OpenAIEmbedding",
         "ollama": "mem0.embeddings.ollama.OllamaEmbedding",
         "huggingface": "mem0.embeddings.huggingface.HuggingFaceEmbedding",
@@ -171,7 +179,8 @@ class EmbedderFactory:
         class_type = cls.provider_to_class.get(provider_name)
         if class_type:
             embedder_instance = load_class(class_type)
-            base_config = BaseEmbedderConfig(**config)
+            config_class = DashScopeEmbedderConfig if provider_name == "dashscope" else BaseEmbedderConfig
+            base_config = config_class(**config)
             return embedder_instance(base_config)
         else:
             raise ValueError(f"Unsupported Embedder provider: {provider_name}")
@@ -232,6 +241,7 @@ class RerankerFactory:
     # Provider mappings with their config classes
     provider_to_class = {
         "cohere": ("mem0.reranker.cohere_reranker.CohereReranker", CohereRerankerConfig),
+        "dashscope": ("mem0.reranker.dashscope_reranker.DashScopeReranker", DashScopeRerankerConfig),
         "sentence_transformer": (
             "mem0.reranker.sentence_transformer_reranker.SentenceTransformerReranker",
             SentenceTransformerRerankerConfig,

@@ -2,19 +2,19 @@ FROM python:3.12
 
 WORKDIR /app
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
-ENV PATH="/root/.local/bin:$PATH"
+# Use the mirror for build-time and runtime pip installs.
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Copy requirements first for better caching
 COPY server/requirements.txt .
 RUN pip install -r requirements.txt
 
-# Install mem0 in editable mode using Poetry
-WORKDIR /app/packages
+# Install mem0 in editable mode using pip
+WORKDIR /opt/mem0
 COPY pyproject.toml .
 COPY poetry.lock .
 COPY README.md .
+COPY LICENSE .
 COPY mem0 ./mem0
 RUN pip install -e .[graph]
 

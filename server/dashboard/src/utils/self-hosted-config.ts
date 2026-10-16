@@ -9,6 +9,7 @@ type ProviderConfig = {
 export type EffectiveConfig = {
   llm?: ProviderConfig;
   embedder?: ProviderConfig;
+  reranker?: ProviderConfig | null;
 };
 
 export const getEffectiveConfig = (data: unknown): EffectiveConfig | null => {
@@ -40,8 +41,10 @@ export const buildProviderConfig = ({
   return {
     provider,
     config: {
-      model: model || undefined,
+      model: model.trim() || undefined,
       api_key: apiKey || undefined,
+      // Clear any previously saved override so DashScope uses the server environment.
+      ...(provider === "dashscope" ? { base_url: null } : {}),
     },
   };
 };

@@ -65,7 +65,15 @@ def _merge_config(base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, An
     merged = deepcopy(base)
 
     for key, value in updates.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+        if (
+            isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+            and value.get("provider")
+            and value["provider"] != merged[key].get("provider")
+        ):
+            # Credentials and provider-specific options must not cross provider boundaries.
+            merged[key] = deepcopy(value)
+        elif isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = _merge_config(merged[key], value)
         else:
             merged[key] = value
@@ -87,8 +95,9 @@ def update_config(updates: Dict[str, Any]) -> Dict[str, Any]:
     global _current_config, _memory_instance
     with _state_lock:
         next_config = _merge_config(_current_config, updates)
+        next_instance = Memory.from_config(next_config)
         _current_config = next_config
-        _memory_instance = Memory.from_config(next_config)
+        _memory_instance = next_instance
         overrides = _load_overrides()
         overrides = _merge_config(overrides, updates)
         _save_overrides(overrides)

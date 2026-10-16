@@ -1,0 +1,7 @@
+.git
+.env
+.env.*
+history
+**/node_modules
+**/.next
+**/__pycache__

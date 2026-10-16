@@ -1,6 +1,17 @@
 # Mem0 Self-Hosted Server
 
+For this fork's current deployment workflow, start with the root
+[English README](../README.md) or [中文 README](../README.zh-CN.md).
+The current Compose file connects to an existing PostgreSQL instance; it does not
+start its own database. The sections below retain upstream operational and
+historical migration notes and should be read with that deployment difference in mind.
+
 Mem0 ships a self-hosted FastAPI server plus a local dashboard. It is secure by default, supports dashboard login and API keys, and exposes OpenAPI docs at `/docs`.
+
+For Alibaba Cloud chat, embeddings, and reranking, see [DashScope Models](../docs/integrations/dashscope-rerank.mdx).
+Set `DASHSCOPE_API_KEY` and `DASHSCOPE_BASE_URL`, then select `dashscope` on the dashboard Configuration page.
+The page supports configuring or disabling a reranker. Rebuild both API and dashboard images after updating code.
+`POST /search` accepts `rerank: true`, `candidate_k` (retrieval depth), and `top_k` (final result count).
 
 > **Upgrading?** The Postgres image changed from the archived `ankane/pgvector:v0.5.1`
 > to the official `pgvector/pgvector:pg17`, and `POSTGRES_PASSWORD` is now a required
@@ -17,8 +28,25 @@ Copy the example env file and set a Postgres password (required):
 ```bash
 cd server
 cp .env.example .env
-# Edit .env — at minimum set POSTGRES_PASSWORD and OPENAI_API_KEY
+# Edit .env — configure the existing database, JWT_SECRET, and model credentials.
 ```
+
+Keep deployment-specific values in the ignored `server/.env`, and commit only
+placeholders or local defaults in `.env.example`:
+
+```dotenv
+DASHBOARD_URL=http://localhost:3000
+PUBLIC_API_URL=http://localhost:8888
+MEM0_DASHBOARD_PORT=3000
+MEM0_API_PORT=8888
+```
+
+`DASHBOARD_URL` is the browser-facing dashboard origin and CORS origin.
+`PUBLIC_API_URL` is the API URL reachable from the browser. Set both to your own
+external addresses when using a reverse proxy. `MEM0_*_PORT` controls Docker host
+port mappings; container ports remain 3000 and 8000. Database and model credentials
+also belong in `.env`. Git and Docker build contexts exclude local environment
+files and runtime history. Recreate containers after editing environment values.
 
 ### Agent-first
 

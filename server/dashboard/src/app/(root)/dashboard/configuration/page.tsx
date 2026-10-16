@@ -20,6 +20,7 @@ import { MEMORY_ENDPOINTS } from "@/utils/api-endpoints";
 import {
   buildProviderConfig,
   getEffectiveConfig,
+  type EffectiveConfig,
 } from "@/utils/self-hosted-config";
 import { useAuth } from "@/hooks/use-auth";
 import { useApiQuery } from "@/hooks/use-api-query";
@@ -27,16 +28,149 @@ import { useApiQuery } from "@/hooks/use-api-query";
 type BundledProviders = {
   llm: string[];
   embedder: string[];
+  reranker: string[];
 };
+
+type ModelForm = {
+  provider: string;
+  model: string;
+  apiKey: string;
+};
+
+const emptyModel: ModelForm = {
+  provider: "",
+  model: "",
+  apiKey: "",
+};
+const dashscopeModels = {
+  llm: "qwen3.6-flash",
+  embedder: "qwen3.7-text-embedding-flash",
+  reranker: "qwen3.7-text-rerank",
+};
+
+function modelForm(config: EffectiveConfig["llm"]): ModelForm {
+  return {
+    provider: config?.provider || "",
+    model: config?.config?.model || "",
+    apiKey: "",
+  };
+}
+
+function ModelCard({
+  title,
+  kind,
+  value,
+  onChange,
+  providers,
+  disabled,
+}: {
+  title: string;
+  kind: keyof BundledProviders;
+  value: ModelForm;
+  onChange: (value: ModelForm) => void;
+  providers?: string[];
+  disabled: boolean;
+}) {
+  const isDisabled = value.provider === "none";
+  return (
+    <Card className="border-memBorder-primary">
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs" htmlFor={`${kind}-provider`}>
+              Provider
+            </Label>
+            <Select
+              value={value.provider}
+              onValueChange={(provider) =>
+                onChange({
+                  ...emptyModel,
+                  provider,
+                  model: provider === "dashscope" ? dashscopeModels[kind] : "",
+                })
+              }
+              disabled={disabled || !providers}
+            >
+              <SelectTrigger id={`${kind}-provider`}>
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {kind === "reranker" && (
+                  <SelectItem value="none">Disabled</SelectItem>
+                )}
+                {providers?.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs" htmlFor={`${kind}-model`}>
+              Model
+            </Label>
+            <Input
+              id={`${kind}-model`}
+              value={value.model}
+              placeholder={
+                value.provider === "dashscope"
+                  ? dashscopeModels[kind]
+                  : kind === "embedder"
+                    ? "text-embedding-3-small"
+                    : "gpt-5-mini"
+              }
+              onChange={(e) => onChange({ ...value, model: e.target.value })}
+              disabled={disabled || isDisabled}
+            />
+          </div>
+        </div>
+        {!isDisabled && (
+          <>
+            <div className="space-y-1">
+              <Label className="text-xs" htmlFor={`${kind}-key`}>
+                API Key (optional override)
+              </Label>
+              <Input
+                id={`${kind}-key`}
+                type="password"
+                autoComplete="new-password"
+                value={value.apiKey}
+                placeholder={
+                  value.provider === "dashscope"
+                    ? "Use saved key or DASHSCOPE_API_KEY"
+                    : "Keep saved key or server environment"
+                }
+                onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
+                disabled={disabled}
+              />
+            </div>
+          </>
+        )}
+        {kind === "reranker" && (
+          <p className="text-xs text-onSurface-default-tertiary">
+            Configure a model here, then send rerank: true in search requests.
+            candidate_k controls retrieval depth; top_k limits final results.
+            Reranking adds model latency and usage.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function ConfigurationPage() {
   const { isAdmin } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
-  const [llmProvider, setLlmProvider] = useState("");
-  const [llmModel, setLlmModel] = useState("");
-  const [llmApiKey, setLlmApiKey] = useState("");
-  const [embedderProvider, setEmbedderProvider] = useState("");
-  const [embedderModel, setEmbedderModel] = useState("");
+  const [llm, setLlm] = useState<ModelForm>(emptyModel);
+  const [embedder, setEmbedder] = useState<ModelForm>(emptyModel);
+  const [reranker, setReranker] = useState<ModelForm>({
+    ...emptyModel,
+    provider: "none",
+  });
 
   const { data: config, isLoading: isPrefilling } = useApiQuery(
     async () => {
@@ -58,43 +192,40 @@ export default function ConfigurationPage() {
 
   useEffect(() => {
     if (!config) return;
-    setLlmProvider((current) => current || config.llm?.provider || "");
-    setLlmModel((current) => current || config.llm?.config?.model || "");
-    setEmbedderProvider(
-      (current) => current || config.embedder?.provider || "",
-    );
-    setEmbedderModel(
-      (current) => current || config.embedder?.config?.model || "",
+    setLlm(modelForm(config.llm));
+    setEmbedder(modelForm(config.embedder));
+    setReranker(
+      config.reranker
+        ? modelForm(config.reranker)
+        : { ...emptyModel, provider: "none" },
     );
   }, [config]);
 
   const handleSave = async () => {
+    const enabledModels = [
+      llm,
+      embedder,
+      ...(reranker.provider !== "none" ? [reranker] : []),
+    ];
+    if (enabledModels.some((model) => !model.provider || !model.model.trim())) {
+      toast({
+        title: "Select a provider and model for each enabled model",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSaving(true);
-
     try {
-      const llm = buildProviderConfig({
-        provider: llmProvider,
-        model: llmModel,
-        apiKey: llmApiKey,
-      });
-      const embedder = buildProviderConfig({
-        provider: embedderProvider,
-        model: embedderModel,
-      });
-
-      const newConfig: Record<string, unknown> = {
+      await api.post(MEMORY_ENDPOINTS.CONFIGURE, {
         version: "v1.1",
-      };
-
-      if (llm) {
-        newConfig.llm = llm;
-      }
-
-      if (embedder) {
-        newConfig.embedder = embedder;
-      }
-
-      await api.post(MEMORY_ENDPOINTS.CONFIGURE, newConfig);
+        llm: buildProviderConfig(llm),
+        embedder: buildProviderConfig(embedder),
+        reranker:
+          reranker.provider === "none" ? null : buildProviderConfig(reranker),
+      });
+      setLlm((current) => ({ ...current, apiKey: "" }));
+      setEmbedder((current) => ({ ...current, apiKey: "" }));
+      setReranker((current) => ({ ...current, apiKey: "" }));
       toast({ title: "Configuration saved", variant: "success" });
     } catch (error) {
       toast({
@@ -107,6 +238,7 @@ export default function ConfigurationPage() {
     }
   };
 
+  const disabled = !isAdmin || isPrefilling || isSaving;
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -117,116 +249,38 @@ export default function ConfigurationPage() {
           </p>
         )}
       </div>
-
-      <Card className="border-memBorder-primary">
-        <CardHeader>
-          <CardTitle className="text-sm">LLM Provider</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Provider</Label>
-              <Select
-                value={llmProvider}
-                onValueChange={(value) => {
-                  setLlmProvider(value);
-                  setLlmApiKey("");
-                }}
-                disabled={!isAdmin || !providers}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers?.llm.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Model</Label>
-              <Input
-                placeholder="gpt-4.1-nano-2025-04-14"
-                value={llmModel}
-                onChange={(e) => setLlmModel(e.target.value)}
-                disabled={!isAdmin}
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">API Key</Label>
-            <Input
-              type="password"
-              placeholder="sk-..."
-              value={llmApiKey}
-              onChange={(e) => setLlmApiKey(e.target.value)}
-              disabled={!isAdmin}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-memBorder-primary">
-        <CardHeader>
-          <CardTitle className="text-sm">Embedding Model</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Provider</Label>
-              <Select
-                value={embedderProvider}
-                onValueChange={setEmbedderProvider}
-                disabled={!isAdmin || !providers}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers?.embedder.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Model</Label>
-              <Input
-                placeholder="text-embedding-3-small"
-                value={embedderModel}
-                onChange={(e) => setEmbedderModel(e.target.value)}
-                disabled={!isAdmin}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <p className="text-xs text-onSurface-default-tertiary">
-        Need another provider? Install its Python package, rebuild the image,
-        and extend the bundled list. See the{" "}
-        <a
-          href="https://docs.mem0.ai/open-source/setup#supported-providers"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-4 hover:text-onSurface-default-primary"
-        >
-          setup guide
-        </a>
-        .
-      </p>
-
+      <ModelCard
+        title="LLM Provider"
+        kind="llm"
+        value={llm}
+        onChange={setLlm}
+        providers={providers?.llm}
+        disabled={disabled}
+      />
+      <ModelCard
+        title="Embedding Model"
+        kind="embedder"
+        value={embedder}
+        onChange={setEmbedder}
+        providers={providers?.embedder}
+        disabled={disabled}
+      />
+      <ModelCard
+        title="Reranking Model"
+        kind="reranker"
+        value={reranker}
+        onChange={setReranker}
+        providers={providers?.reranker}
+        disabled={disabled}
+      />
       {isAdmin && (
-        <Button onClick={handleSave} disabled={isSaving}>
+        <Button
+          onClick={handleSave}
+          disabled={disabled || !config || !providers}
+        >
           {isSaving ? "Saving..." : "Save Configuration"}
         </Button>
       )}
-
       <UpgradeBanner
         id="config-sso"
         message="Looking for SSO / SAML? Available in Enterprise."

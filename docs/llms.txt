@@ -244,6 +244,8 @@ If the user is on a pre-current major (Python < 2, TS < 3, or a Platform call st
 
 ## Integrations
 
+- [DashScope Models and Reranking](https://docs.mem0.ai/integrations/dashscope-rerank) [OSS]: Use when configuring shared Alibaba Cloud credentials, chat, embeddings, dashboard models, and HTTP reranking.
+
 - [Integrations Overview](https://docs.mem0.ai/integrations) [Both]: Use when surveying every available integration.
 
 ### Agent Frameworks
