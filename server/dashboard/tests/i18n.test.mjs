@@ -46,6 +46,29 @@ test("translations interpolate counts and keep identity values intact", () => {
   );
 });
 
+test("Chinese UI keeps API Key terminology in labels, actions, and messages", () => {
+  assert.equal(translate("zh-CN", "API Key"), "API Key");
+  assert.equal(translate("zh-CN", "API Keys"), "API Keys");
+  const phrases = Object.keys(zhCN).filter((source) =>
+    /api keys?/i.test(source),
+  );
+  assert.ok(phrases.length >= 15);
+  for (const source of phrases) {
+    const rendered = translate("zh-CN", source);
+    assert.match(rendered, /API Keys?/, source);
+    assert.doesNotMatch(rendered, /API\s*[密秘]钥/, source);
+  }
+  for (const source of [
+    "Key",
+    "Create Key",
+    "Keep saved key or server environment",
+    "Leave blank to keep existing key",
+    "Use saved key or DASHSCOPE_API_KEY",
+  ]) {
+    assert.match(translate("zh-CN", source), /(?:API )?Key/, source);
+  }
+});
+
 test("all static translation calls have Chinese entries", () => {
   const root = fileURLToPath(new URL("../src", import.meta.url));
   function files(dir) {

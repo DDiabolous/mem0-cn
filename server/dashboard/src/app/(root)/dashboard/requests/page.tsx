@@ -121,7 +121,7 @@ export default function RequestsPage() {
     {
       key: "createdAt" as keyof RequestLog,
       label: t("Time"),
-      width: 140,
+      width: 180,
       render: (value: string) => (
         <span
           title={format(new Date(value), "PPpp", {
@@ -138,7 +138,7 @@ export default function RequestsPage() {
     {
       key: "method" as keyof RequestLog,
       label: t("Method"),
-      width: 96,
+      width: 116,
       render: (value: string) => (
         <Badge variant="outline" className={getMethodClassName(value)}>
           {value.toUpperCase()}
@@ -148,7 +148,7 @@ export default function RequestsPage() {
     {
       key: "path" as keyof RequestLog,
       label: t("Path"),
-      width: 360,
+      width: 300,
       render: (value: string) => (
         <span className="font-mono text-xs break-all text-onSurface-default-primary">
           {value}
@@ -158,7 +158,7 @@ export default function RequestsPage() {
     {
       key: "statusCode" as keyof RequestLog,
       label: t("Status"),
-      width: 120,
+      width: 100,
       render: (value: number) => (
         <Badge variant="outline" className={getStatusClassName(value)}>
           {value}
@@ -168,10 +168,10 @@ export default function RequestsPage() {
     {
       key: "latencyMs" as keyof RequestLog,
       label: t("Latency"),
-      width: 100,
+      width: 120,
       render: (value: number) => (
         <span>
-          {value} {t("ms")}
+          {value} ms
         </span>
       ),
     },
