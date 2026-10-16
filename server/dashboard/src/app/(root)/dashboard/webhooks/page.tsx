@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { LockedPage } from "@/components/self-hosted/locked-page";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,15 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 function WebhooksMockup() {
+  const { t } = useLanguage();
+
   return (
     <Card className="border-memBorder-primary">
       <CardContent className="p-6 space-y-4">
         <div className="space-y-2">
-          <Label>Endpoint URL</Label>
+          <Label>{t("Endpoint URL")}</Label>
           <Input placeholder="https://your-app.com/webhooks/mem0" disabled />
         </div>
         <div className="space-y-2">
-          <Label>Events</Label>
+          <Label>{t("Events")}</Label>
           <div className="flex flex-col gap-2">
             {[
               "memory.created",
@@ -32,20 +35,24 @@ function WebhooksMockup() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label>Signing Secret</Label>
+          <Label>{t("Signing Secret")}</Label>
           <Input placeholder="whsec_..." disabled type="password" />
         </div>
-        <Button disabled>Create Webhook</Button>
+        <Button disabled>{t("Create Webhook")}</Button>
       </CardContent>
     </Card>
   );
 }
 
 export default function WebhooksPage() {
+  const { t } = useLanguage();
+
   return (
     <LockedPage
-      title="Webhooks"
-      description="Get notified when memories are created, updated, or deleted."
+      title={t("Webhooks")}
+      description={t(
+        "Get notified when memories are created, updated, or deleted.",
+      )}
       previewContent={<WebhooksMockup />}
       utmMedium="dashboard-locked-webhooks"
     />

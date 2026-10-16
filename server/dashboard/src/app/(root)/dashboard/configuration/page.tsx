@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,8 @@ function ModelCard({
   providers?: string[];
   disabled: boolean;
 }) {
+  const { t } = useLanguage();
+
   const isDisabled = value.provider === "none";
   return (
     <Card className="border-memBorder-primary">
@@ -81,7 +84,7 @@ function ModelCard({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs" htmlFor={`${kind}-provider`}>
-              Provider
+              {t("Provider")}
             </Label>
             <Select
               value={value.provider}
@@ -95,11 +98,11 @@ function ModelCard({
               disabled={disabled || !providers}
             >
               <SelectTrigger id={`${kind}-provider`}>
-                <SelectValue placeholder="Select provider" />
+                <SelectValue placeholder={t("Select provider")} />
               </SelectTrigger>
               <SelectContent>
                 {kind === "reranker" && (
-                  <SelectItem value="none">Disabled</SelectItem>
+                  <SelectItem value="none">{t("Disabled")}</SelectItem>
                 )}
                 {providers?.map((name) => (
                   <SelectItem key={name} value={name}>
@@ -111,7 +114,7 @@ function ModelCard({
           </div>
           <div className="space-y-1">
             <Label className="text-xs" htmlFor={`${kind}-model`}>
-              Model
+              {t("Model")}
             </Label>
             <Input
               id={`${kind}-model`}
@@ -132,7 +135,7 @@ function ModelCard({
           <>
             <div className="space-y-1">
               <Label className="text-xs" htmlFor={`${kind}-key`}>
-                API Key (optional override)
+                {t("API Key (optional override)")}
               </Label>
               <Input
                 id={`${kind}-key`}
@@ -141,8 +144,8 @@ function ModelCard({
                 value={value.apiKey}
                 placeholder={
                   value.provider === "dashscope"
-                    ? "Use saved key or DASHSCOPE_API_KEY"
-                    : "Keep saved key or server environment"
+                    ? t("Use saved key or DASHSCOPE_API_KEY")
+                    : t("Keep saved key or server environment")
                 }
                 onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
                 disabled={disabled}
@@ -152,9 +155,9 @@ function ModelCard({
         )}
         {kind === "reranker" && (
           <p className="text-xs text-onSurface-default-tertiary">
-            Configure a model here, then send rerank: true in search requests.
-            candidate_k controls retrieval depth; top_k limits final results.
-            Reranking adds model latency and usage.
+            {t(
+              "Configure a model here, then send rerank: true in search requests. candidate_k controls retrieval depth; top_k limits final results. Reranking adds model latency and usage.",
+            )}
           </p>
         )}
       </CardContent>
@@ -163,6 +166,8 @@ function ModelCard({
 }
 
 export default function ConfigurationPage() {
+  const { t } = useLanguage();
+
   const { isAdmin } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [llm, setLlm] = useState<ModelForm>(emptyModel);
@@ -209,7 +214,7 @@ export default function ConfigurationPage() {
     ];
     if (enabledModels.some((model) => !model.provider || !model.model.trim())) {
       toast({
-        title: "Select a provider and model for each enabled model",
+        title: t("Select a provider and model for each enabled model"),
         variant: "destructive",
       });
       return;
@@ -226,10 +231,10 @@ export default function ConfigurationPage() {
       setLlm((current) => ({ ...current, apiKey: "" }));
       setEmbedder((current) => ({ ...current, apiKey: "" }));
       setReranker((current) => ({ ...current, apiKey: "" }));
-      toast({ title: "Configuration saved", variant: "success" });
+      toast({ title: t("Configuration saved"), variant: "success" });
     } catch (error) {
       toast({
-        title: "Failed to save configuration",
+        title: t("Failed to save configuration"),
         description: getErrorMessage(error),
         variant: "destructive",
       });
@@ -242,15 +247,17 @@ export default function ConfigurationPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold font-fustat">Configuration</h1>
+        <h1 className="text-xl font-semibold font-fustat">
+          {t("Configuration")}
+        </h1>
         {isPrefilling && (
           <p className="text-sm text-onSurface-default-tertiary">
-            Loading effective server configuration...
+            {t("Loading effective server configuration...")}
           </p>
         )}
       </div>
       <ModelCard
-        title="LLM Provider"
+        title={t("LLM Provider")}
         kind="llm"
         value={llm}
         onChange={setLlm}
@@ -258,7 +265,7 @@ export default function ConfigurationPage() {
         disabled={disabled}
       />
       <ModelCard
-        title="Embedding Model"
+        title={t("Embedding Model")}
         kind="embedder"
         value={embedder}
         onChange={setEmbedder}
@@ -266,7 +273,7 @@ export default function ConfigurationPage() {
         disabled={disabled}
       />
       <ModelCard
-        title="Reranking Model"
+        title={t("Reranking Model")}
         kind="reranker"
         value={reranker}
         onChange={setReranker}
@@ -278,13 +285,13 @@ export default function ConfigurationPage() {
           onClick={handleSave}
           disabled={disabled || !config || !providers}
         >
-          {isSaving ? "Saving..." : "Save Configuration"}
+          {isSaving ? t("Saving...") : t("Save Configuration")}
         </Button>
       )}
       <UpgradeBanner
         id="config-sso"
-        message="Looking for SSO / SAML? Available in Enterprise."
-        ctaLabel="Contact sales"
+        message={t("Looking for SSO / SAML? Available in Enterprise.")}
+        ctaLabel={t("Contact sales")}
         ctaUrl="https://app.mem0.ai/enterprise?utm_source=oss&utm_medium=dashboard-configuration-sso"
         variant="enterprise"
       />

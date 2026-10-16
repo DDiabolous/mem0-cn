@@ -3,6 +3,9 @@ import { Inter, Fustat, Roboto, DMMono, InterDisplay } from "../(root)/fonts";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
+import { LanguageProvider } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export const metadata = {
   title: "Setup | Mem0",
@@ -27,15 +30,22 @@ export default function SetupLayout({
       suppressHydrationWarning
     >
       <body className="font-fustat" suppressHydrationWarning>
-        <AuthProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <div className="fixed right-4 top-4 z-50 flex items-center gap-3">
+                <LanguageSwitcher />
+                <ThemeToggle />
+              </div>
+              {children}
+            </ThemeProvider>
+          </AuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

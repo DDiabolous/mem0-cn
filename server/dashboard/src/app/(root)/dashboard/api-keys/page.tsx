@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ import { useApiQuery } from "@/hooks/use-api-query";
 import { ApiKey, ApiKeyCreateResponse } from "@/types/api";
 
 export default function ApiKeysPage() {
+  const { t, locale } = useLanguage();
+
   const [createOpen, setCreateOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newKey, setNewKey] = useState("");
@@ -55,7 +58,7 @@ export default function ApiKeysPage() {
       void refetch();
     } catch (error) {
       toast({
-        title: "Failed to create key",
+        title: t("Failed to create key"),
         description: getErrorMessage(error),
         variant: "destructive",
       });
@@ -66,12 +69,12 @@ export default function ApiKeysPage() {
     if (!keyToRevoke) return;
     try {
       await api.delete(API_KEY_ENDPOINTS.BY_ID(keyToRevoke.id));
-      toast({ title: "API key revoked", variant: "success" });
+      toast({ title: t("API key revoked"), variant: "success" });
       setKeyToRevoke(null);
       void refetch();
     } catch (error) {
       toast({
-        title: "Failed to revoke key",
+        title: t("Failed to revoke key"),
         description: getErrorMessage(error),
         variant: "destructive",
       });
@@ -88,10 +91,10 @@ export default function ApiKeysPage() {
   };
 
   const columns = [
-    { key: "label" as keyof ApiKey, label: "Label", width: 150 },
+    { key: "label" as keyof ApiKey, label: t("Label"), width: 150 },
     {
       key: "key_prefix" as keyof ApiKey,
-      label: "Key",
+      label: t("Key"),
       width: 120,
       render: (value: string) => (
         <code className="text-xs font-mono">{value}...</code>
@@ -99,16 +102,25 @@ export default function ApiKeysPage() {
     },
     {
       key: "created_at" as keyof ApiKey,
-      label: "Created",
+      label: t("Created"),
       width: 120,
-      render: (value: string) => format(new Date(value), "MMM d, yyyy"),
+      render: (value: string) =>
+        format(
+          new Date(value),
+          locale === "zh-CN" ? "yyyy年M月d日" : "MMM d, yyyy",
+        ),
     },
     {
       key: "last_used_at" as keyof ApiKey,
-      label: "Last Used",
+      label: t("Last Used"),
       width: 120,
       render: (value: string | null) =>
-        value ? format(new Date(value), "MMM d, yyyy") : "Never",
+        value
+          ? format(
+              new Date(value),
+              locale === "zh-CN" ? "yyyy年M月d日" : "MMM d, yyyy",
+            )
+          : t("Never"),
     },
     {
       key: "id" as keyof ApiKey,
@@ -130,26 +142,26 @@ export default function ApiKeysPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold font-fustat">API Keys</h1>
+        <h1 className="text-xl font-semibold font-fustat">{t("API Keys")}</h1>
         <Dialog open={createOpen} onOpenChange={handleDialogClose}>
           <DialogTrigger asChild>
             <Button size="sm">
-              <Plus className="size-4 mr-1" /> Create Key
+              <Plus className="size-4 mr-1" /> {t("Create Key")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create API Key</DialogTitle>
+              <DialogTitle>{t("Create API Key")}</DialogTitle>
             </DialogHeader>
             {!newKey ? (
               <div className="space-y-4 mt-2">
                 <div className="space-y-2">
-                  <Label htmlFor="api-key-label">Label</Label>
+                  <Label htmlFor="api-key-label">{t("Label")}</Label>
                   <Input
                     id="api-key-label"
                     value={newLabel}
                     onChange={(e) => setNewLabel(e.target.value)}
-                    placeholder="e.g. Production"
+                    placeholder={t("e.g. Production")}
                   />
                 </div>
                 <Button
@@ -157,13 +169,13 @@ export default function ApiKeysPage() {
                   disabled={!newLabel}
                   className="w-full"
                 >
-                  Create
+                  {t("Create")}
                 </Button>
               </div>
             ) : (
               <div className="space-y-4 mt-2">
                 <div className="space-y-2">
-                  <Label htmlFor="api-key-new">Your API Key</Label>
+                  <Label htmlFor="api-key-new">{t("Your API Key")}</Label>
                   <div className="flex gap-2">
                     <Input
                       id="api-key-new"
@@ -188,14 +200,14 @@ export default function ApiKeysPage() {
                     </CopyToClipboard>
                   </div>
                   <p className="text-xs text-onSurface-danger-primary">
-                    Save this key -- you won&apos;t see it again.
+                    {t("Save this key -- you won't see it again.")}
                   </p>
                 </div>
                 <Button
                   onClick={() => handleDialogClose(false)}
                   className="w-full"
                 >
-                  Done
+                  {t("Done")}
                 </Button>
               </div>
             )}
@@ -206,8 +218,10 @@ export default function ApiKeysPage() {
       {keys.length >= 3 && (
         <UpgradeBanner
           id="api-keys-3"
-          message="Managing multiple apps? Cloud offers project-based isolation."
-          ctaLabel="Explore Cloud"
+          message={t(
+            "Managing multiple apps? Cloud offers project-based isolation.",
+          )}
+          ctaLabel={t("Explore Cloud")}
           ctaUrl="https://app.mem0.ai?utm_source=oss&utm_medium=dashboard-api-keys"
           variant="cloud"
         />
@@ -217,8 +231,10 @@ export default function ApiKeysPage() {
         <TableSkeleton rows={3} columns={4} />
       ) : keys.length === 0 ? (
         <EmptyState
-          title="No API keys yet"
-          description="Create your first API key to start using the Mem0 API."
+          title={t("No API keys yet")}
+          description={t(
+            "Create your first API key to start using the Mem0 API.",
+          )}
         />
       ) : (
         <Card className="border-memBorder-primary overflow-hidden">
@@ -234,8 +250,10 @@ export default function ApiKeysPage() {
         isOpen={!!keyToRevoke}
         onClose={() => setKeyToRevoke(null)}
         onConfirm={handleRevoke}
-        title="Revoke API key"
-        description="Applications using this key will immediately stop working. This cannot be undone."
+        title={t("Revoke API key")}
+        description={t(
+          "Applications using this key will immediately stop working. This cannot be undone.",
+        )}
         itemName={keyToRevoke?.label ?? ""}
         confirmButtonText="Revoke"
       />

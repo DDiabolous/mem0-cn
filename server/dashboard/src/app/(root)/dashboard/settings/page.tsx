@@ -1,7 +1,10 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import { Sun, Moon, Monitor } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useTemporaryTheme } from "@/components/theme-provider";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +17,11 @@ import { api } from "@/utils/api";
 import { AUTH_ENDPOINTS } from "@/utils/api-endpoints";
 
 export default function SettingsPage() {
+  const { t, preference, setPreference } = useLanguage();
+
   const { user, refreshUser } = useAuth();
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const { clearTemporaryTheme } = useTemporaryTheme();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -45,10 +51,10 @@ export default function SettingsPage() {
         email: email.trim(),
       });
       await refreshUser();
-      toast({ title: "Profile updated", variant: "success" });
+      toast({ title: t("Profile updated"), variant: "success" });
     } catch (error) {
       toast({
-        title: "Failed to update profile",
+        title: t("Failed to update profile"),
         description: getErrorMessage(error),
         variant: "destructive",
       });
@@ -60,7 +66,7 @@ export default function SettingsPage() {
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
       toast({
-        title: "Passwords don't match",
+        title: t("Passwords don't match"),
         variant: "destructive",
       });
       return;
@@ -75,10 +81,10 @@ export default function SettingsPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      toast({ title: "Password updated", variant: "success" });
+      toast({ title: t("Password updated"), variant: "success" });
     } catch (error) {
       toast({
-        title: "Failed to update password",
+        title: t("Failed to update password"),
         description: getErrorMessage(error),
         variant: "destructive",
       });
@@ -89,17 +95,17 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold font-fustat">Settings</h1>
+      <h1 className="text-xl font-semibold font-fustat">{t("Settings")}</h1>
 
       <Card className="border-memBorder-primary">
         <CardHeader>
-          <CardTitle className="text-sm">Profile</CardTitle>
+          <CardTitle className="text-sm">{t("Profile")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="settings-name" className="text-xs">
-                Name
+                {t("Name")}
               </Label>
               <Input
                 id="settings-name"
@@ -109,7 +115,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="settings-email" className="text-xs">
-                Email
+                {t("Email")}
               </Label>
               <Input
                 id="settings-email"
@@ -123,19 +129,19 @@ export default function SettingsPage() {
             onClick={handleSaveProfile}
             disabled={!profileDirty || !profileValid || savingProfile}
           >
-            {savingProfile ? "Saving..." : "Save profile"}
+            {savingProfile ? t("Saving...") : t("Save profile")}
           </Button>
         </CardContent>
       </Card>
 
       <Card className="border-memBorder-primary">
         <CardHeader>
-          <CardTitle className="text-sm">Password</CardTitle>
+          <CardTitle className="text-sm">{t("Password")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="settings-current-password" className="text-xs">
-              Current password
+              {t("Current password")}
             </Label>
             <Input
               id="settings-current-password"
@@ -147,19 +153,19 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="settings-new-password" className="text-xs">
-                New password
+                {t("New password")}
               </Label>
               <Input
                 id="settings-new-password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Min 8 characters"
+                placeholder={t("Min 8 characters")}
               />
             </div>
             <div className="space-y-1">
               <Label htmlFor="settings-confirm-password" className="text-xs">
-                Confirm new password
+                {t("Confirm new password")}
               </Label>
               <Input
                 id="settings-confirm-password"
@@ -178,39 +184,86 @@ export default function SettingsPage() {
               savingPassword
             }
           >
-            {savingPassword ? "Saving..." : "Update password"}
+            {savingPassword ? t("Saving...") : t("Update password")}
           </Button>
         </CardContent>
       </Card>
 
       <Card className="border-memBorder-primary">
         <CardHeader>
-          <CardTitle className="text-sm">Appearance</CardTitle>
+          <CardTitle className="text-sm">{t("Appearance")}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <span className="text-sm text-onSurface-default-secondary">
-              Theme
+            <span className="w-20 text-sm text-onSurface-default-secondary">
+              {t("Theme")}
             </span>
-            <button
-              onClick={() => setTheme("light")}
-              className="p-2 rounded hover:bg-surface-default-secondary-hover"
+            <div
+              role="group"
+              aria-label={t("Theme")}
+              className="flex items-center gap-2"
             >
-              <Sun className="size-4" />
-            </button>
-            <button
-              onClick={() => setTheme("dark")}
-              className="p-2 rounded hover:bg-surface-default-secondary-hover"
-            >
-              <Moon className="size-4" />
-            </button>
-            <button
-              onClick={() => setTheme("system")}
-              className="p-2 rounded hover:bg-surface-default-secondary-hover"
-            >
-              <Monitor className="size-4" />
-            </button>
+              {[
+                { value: "light", label: t("Light"), Icon: Sun },
+                { value: "dark", label: t("Dark"), Icon: Moon },
+                { value: "system", label: t("System"), Icon: Monitor },
+              ].map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={(theme || "system") === value}
+                  onClick={() => {
+                    clearTemporaryTheme();
+                    setTheme(value);
+                  }}
+                  className={cn(
+                    "rounded-md p-2 text-onSurface-default-secondary hover:bg-surface-default-secondary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memPurple-500",
+                    (theme || "system") === value &&
+                      "bg-surface-default-tertiary text-onSurface-default-primary",
+                  )}
+                >
+                  <Icon aria-hidden="true" className="size-4" />
+                </button>
+              ))}
+            </div>
           </div>
+          <div className="flex items-center gap-4">
+            <span className="w-20 text-sm text-onSurface-default-secondary">
+              {t("Language")}
+            </span>
+            <div
+              role="group"
+              aria-label={t("Language")}
+              className="flex flex-wrap items-center gap-2"
+            >
+              {[
+                { value: "zh-CN" as const, label: "简体中文" },
+                { value: "en" as const, label: "English" },
+                { value: "system" as const, label: t("System") },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={preference === value}
+                  onClick={() => setPreference(value)}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm text-onSurface-default-secondary hover:bg-surface-default-secondary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memPurple-500",
+                    preference === value &&
+                      "bg-surface-default-tertiary text-onSurface-default-primary",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-onSurface-default-tertiary">
+            {t(
+              "Appearance preferences apply to future logins in this browser.",
+            )}
+          </p>
         </CardContent>
       </Card>
     </div>

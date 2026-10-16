@@ -1,6 +1,7 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy } from "lucide-react";
 import { CopyToClipboard } from "react-copy-to-clipboard";
@@ -63,6 +64,11 @@ const USE_CASE_PRESETS = [
 const DEFAULT_TEST_MESSAGE = "I like to hike on weekends.";
 
 export default function SetupPage() {
+  const { t } = useLanguage();
+  // Keep error messages current without reloading and replacing edited fields.
+  const translateRef = useRef(t);
+  translateRef.current = t;
+
   const router = useRouter();
   const { register } = useAuth();
   const [step, setStep] = useState(0);
@@ -138,7 +144,12 @@ export default function SetupPage() {
         setProviders(providersRes.data);
       } catch (err) {
         if (active) {
-          setError(getErrorMessage(err, "Could not read server configuration"));
+          setError(
+            getErrorMessage(
+              err,
+              translateRef.current("Could not read server configuration"),
+            ),
+          );
         }
       } finally {
         if (active) {
@@ -158,17 +169,17 @@ export default function SetupPage() {
     e.preventDefault();
 
     if (!isValidEmail(email)) {
-      setError("Enter a valid email address.");
+      setError(t("Enter a valid email address."));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords don't match");
+      setError(t("Passwords don't match"));
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setError(t("Password must be at least 8 characters"));
       return;
     }
 
@@ -179,7 +190,7 @@ export default function SetupPage() {
       await register(name, email, password);
       setStep(1);
     } catch (err) {
-      setError(getErrorMessage(err, "Registration failed"));
+      setError(getErrorMessage(err, t("Registration failed")));
     } finally {
       setIsLoading(false);
     }
@@ -228,7 +239,7 @@ export default function SetupPage() {
       setInitialEmbedderModel(embedderModel);
       setStep(2);
     } catch (err) {
-      setError(getErrorMessage(err, "Failed to save configuration"));
+      setError(getErrorMessage(err, t("Failed to save configuration")));
     } finally {
       setIsLoading(false);
     }
@@ -245,7 +256,7 @@ export default function SetupPage() {
       });
       setApiKey(res.data.key);
     } catch (err) {
-      setError(getErrorMessage(err, "Failed to create API key"));
+      setError(getErrorMessage(err, t("Failed to create API key")));
     } finally {
       setIsLoading(false);
     }
@@ -297,7 +308,7 @@ export default function SetupPage() {
         .post(AUTH_ENDPOINTS.ONBOARDING_COMPLETE, { use_case: useCase })
         .catch(() => {});
     } catch (err) {
-      setError(getErrorMessage(err, "Test failed"));
+      setError(getErrorMessage(err, t("Test failed")));
     } finally {
       setIsLoading(false);
     }
@@ -331,18 +342,18 @@ export default function SetupPage() {
           ))}
         </div>
         <p className="text-center text-sm text-onSurface-default-tertiary">
-          {STEPS[step]}
+          {t(STEPS[step])}
         </p>
 
         <Card className="border-memBorder-primary">
           <CardContent className="p-6 space-y-4">
             <div className="space-y-1">
               <h2 className="text-base font-semibold font-fustat">
-                {STEP_TITLES[step]}
+                {t(STEP_TITLES[step])}
               </h2>
               {isPrefillingConfig && step === 1 && (
                 <p className="text-xs text-onSurface-default-tertiary">
-                  Checking server configuration...
+                  {t("Checking server configuration...")}
                 </p>
               )}
             </div>
@@ -353,16 +364,16 @@ export default function SetupPage() {
             {step === 0 && (
               <form onSubmit={handleStep1} className="space-y-4">
                 <div className="space-y-1">
-                  <Label htmlFor="setup-name">Name</Label>
+                  <Label htmlFor="setup-name">{t("Name")}</Label>
                   <Input
                     id="setup-name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
+                    placeholder={t("Your name")}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="setup-email">Email</Label>
+                  <Label htmlFor="setup-email">{t("Email")}</Label>
                   <Input
                     id="setup-email"
                     type="email"
@@ -372,18 +383,18 @@ export default function SetupPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="setup-password">Password</Label>
+                  <Label htmlFor="setup-password">{t("Password")}</Label>
                   <Input
                     id="setup-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min 8 characters"
+                    placeholder={t("Min 8 characters")}
                   />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="setup-confirm-password">
-                    Confirm Password
+                    {t("Confirm Password")}
                   </Label>
                   <Input
                     id="setup-confirm-password"
@@ -397,7 +408,7 @@ export default function SetupPage() {
                   disabled={isLoading || !name || !email || !password}
                   className="w-full"
                 >
-                  {isLoading ? "Creating..." : "Create Admin Account"}
+                  {isLoading ? t("Creating...") : t("Create Admin Account")}
                 </Button>
               </form>
             )}
@@ -407,16 +418,18 @@ export default function SetupPage() {
                 {!serverHasLlmKey && (
                   <div className="rounded-md border border-memBorder-primary bg-surface-default-secondary p-3">
                     <p className="text-xs text-onSurface-default-tertiary">
-                      No LLM provider API key is configured on the server. Paste
-                      one below to continue — it will be saved to the server and
-                      used for all memory operations.
+                      {t(
+                        "No LLM provider API key is configured on the server. Paste one below to continue — it will be saved to the server and used for all memory operations.",
+                      )}
                     </p>
                   </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label htmlFor="setup-llm-provider">LLM Provider</Label>
+                    <Label htmlFor="setup-llm-provider">
+                      {t("LLM Provider")}
+                    </Label>
                     <Select
                       value={llmProvider}
                       onValueChange={(value) => {
@@ -426,7 +439,7 @@ export default function SetupPage() {
                       disabled={!providers}
                     >
                       <SelectTrigger id="setup-llm-provider">
-                        <SelectValue placeholder="Select provider" />
+                        <SelectValue placeholder={t("Select provider")} />
                       </SelectTrigger>
                       <SelectContent>
                         {providers?.llm.map((name) => (
@@ -438,7 +451,7 @@ export default function SetupPage() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="setup-llm-model">Model</Label>
+                    <Label htmlFor="setup-llm-model">{t("Model")}</Label>
                     <Input
                       id="setup-llm-model"
                       value={llmModel}
@@ -450,7 +463,7 @@ export default function SetupPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="setup-llm-api-key">LLM API Key</Label>
+                  <Label htmlFor="setup-llm-api-key">{t("LLM API Key")}</Label>
                   <Input
                     id="setup-llm-api-key"
                     type="password"
@@ -458,20 +471,22 @@ export default function SetupPage() {
                     onChange={(e) => setLlmApiKey(e.target.value)}
                     placeholder={
                       serverHasLlmKey
-                        ? "Leave blank to keep existing key"
+                        ? t("Leave blank to keep existing key")
                         : "sk-..."
                     }
                     className="font-mono text-sm"
                   />
                   <p className="text-xs text-onSurface-default-tertiary">
-                    Also used for the embedder when it shares the same provider.
+                    {t(
+                      "Also used for the embedder when it shares the same provider.",
+                    )}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="setup-embedder-provider">
-                      Embedder Provider
+                      {t("Embedder Provider")}
                     </Label>
                     <Select
                       value={embedderProvider}
@@ -479,7 +494,7 @@ export default function SetupPage() {
                       disabled={!providers}
                     >
                       <SelectTrigger id="setup-embedder-provider">
-                        <SelectValue placeholder="Select provider" />
+                        <SelectValue placeholder={t("Select provider")} />
                       </SelectTrigger>
                       <SelectContent>
                         {providers?.embedder.map((name) => (
@@ -491,7 +506,7 @@ export default function SetupPage() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="setup-embedder-model">Model</Label>
+                    <Label htmlFor="setup-embedder-model">{t("Model")}</Label>
                     <Input
                       id="setup-embedder-model"
                       value={embedderModel}
@@ -503,15 +518,16 @@ export default function SetupPage() {
                 </div>
 
                 <p className="text-xs text-onSurface-default-tertiary">
-                  Need another provider? Install its Python package and rebuild
-                  the image. See{" "}
+                  {t(
+                    "Need another provider? Install its Python package and rebuild the image. See",
+                  )}{" "}
                   <a
                     href={SUPPORTED_PROVIDERS_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline underline-offset-4 hover:text-onSurface-default-primary"
                   >
-                    supported providers
+                    {t("supported providers")}
                   </a>
                   .
                 </p>
@@ -526,7 +542,7 @@ export default function SetupPage() {
                   }
                   className="w-full"
                 >
-                  {isLoading ? "Saving..." : "Save & Continue"}
+                  {isLoading ? t("Saving...") : t("Save & Continue")}
                 </Button>
               </form>
             )}
@@ -534,16 +550,18 @@ export default function SetupPage() {
             {step === 2 && !apiKey && (
               <form onSubmit={handleStep3} className="space-y-4">
                 <div className="space-y-1">
-                  <Label htmlFor="setup-key-label">Label for this key</Label>
+                  <Label htmlFor="setup-key-label">
+                    {t("Label for this key")}
+                  </Label>
                   <Input
                     id="setup-key-label"
                     value={keyLabel}
                     onChange={(e) => setKeyLabel(e.target.value)}
-                    placeholder="My First Key"
+                    placeholder={t("My First Key")}
                   />
                 </div>
                 <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? "Generating..." : "Generate API Key"}
+                  {isLoading ? t("Generating...") : t("Generate API Key")}
                 </Button>
               </form>
             )}
@@ -551,7 +569,7 @@ export default function SetupPage() {
             {step === 2 && apiKey && (
               <form onSubmit={handleContinueToUseCase} className="space-y-4">
                 <div className="space-y-1">
-                  <Label htmlFor="setup-api-key">Your API Key</Label>
+                  <Label htmlFor="setup-api-key">{t("Your API Key")}</Label>
                   <div className="flex gap-2">
                     <Input
                       id="setup-api-key"
@@ -576,11 +594,11 @@ export default function SetupPage() {
                     </CopyToClipboard>
                   </div>
                   <p className="text-xs text-onSurface-danger-primary">
-                    Save this key. You will not see it again.
+                    {t("Save this key. You will not see it again.")}
                   </p>
                 </div>
                 <Button type="submit" className="w-full">
-                  Continue
+                  {t("Continue")}
                 </Button>
               </form>
             )}
@@ -588,35 +606,40 @@ export default function SetupPage() {
             {step === 3 && (
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <Label htmlFor="setup-use-case">Describe your use case</Label>
+                  <Label htmlFor="setup-use-case">
+                    {t("Describe your use case")}
+                  </Label>
                   <textarea
                     id="setup-use-case"
                     value={useCase}
                     onChange={(e) => setUseCase(e.target.value)}
-                    placeholder="e.g. A personal assistant that remembers my preferences"
+                    placeholder={t(
+                      "e.g. A personal assistant that remembers my preferences",
+                    )}
                     className="flex w-full rounded-md border border-memBorder-primary bg-surface-default-primary px-3 py-2 text-sm placeholder:text-onSurface-default-tertiary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-memPurple-500 min-h-[80px] resize-y"
                   />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {USE_CASE_PRESETS.map((preset) => (
                     <Button
-                      key={preset}
+                      key={t(preset)}
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setUseCase(preset)}
+                      onClick={() => setUseCase(t(preset))}
                       className={cn(
-                        useCase === preset &&
+                        useCase === t(preset) &&
                           "border-memPurple-500 text-memPurple-500",
                       )}
                     >
-                      {preset}
+                      {t(preset)}
                     </Button>
                   ))}
                 </div>
                 <p className="text-xs text-onSurface-default-tertiary">
-                  We&apos;ll generate custom instructions that tell the memory
-                  extractor which facts to prioritize for your use case.
+                  {t(
+                    "We'll generate custom instructions that tell the memory extractor which facts to prioritize for your use case.",
+                  )}
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -625,7 +648,7 @@ export default function SetupPage() {
                     onClick={handleContinueToQuickTest}
                     className="flex-1"
                   >
-                    Skip
+                    {t("Skip")}
                   </Button>
                   <Button
                     type="button"
@@ -649,7 +672,7 @@ export default function SetupPage() {
                         setError(
                           getErrorMessage(
                             err,
-                            "Failed to generate instructions",
+                            t("Failed to generate instructions"),
                           ),
                         );
                       } finally {
@@ -658,15 +681,15 @@ export default function SetupPage() {
                     }}
                   >
                     {isGeneratingInstructions
-                      ? "Generating instructions..."
-                      : "Generate instructions"}
+                      ? t("Generating instructions...")
+                      : t("Generate instructions")}
                   </Button>
                 </div>
                 {customInstructions && (
                   <div className="space-y-3">
                     <div className="space-y-1">
                       <Label htmlFor="setup-instructions">
-                        Generated instructions
+                        {t("Generated instructions")}
                       </Label>
                       <textarea
                         id="setup-instructions"
@@ -688,7 +711,10 @@ export default function SetupPage() {
                           handleContinueToQuickTest();
                         } catch (err) {
                           setError(
-                            getErrorMessage(err, "Failed to save instructions"),
+                            getErrorMessage(
+                              err,
+                              t("Failed to save instructions"),
+                            ),
                           );
                         } finally {
                           setIsLoading(false);
@@ -696,7 +722,7 @@ export default function SetupPage() {
                       }}
                       disabled={isLoading}
                     >
-                      {isLoading ? "Saving..." : "Save & Continue"}
+                      {isLoading ? t("Saving...") : t("Save & Continue")}
                     </Button>
                   </div>
                 )}
@@ -709,11 +735,12 @@ export default function SetupPage() {
                 className="space-y-4"
               >
                 <div className="space-y-1">
-                  <Label>Test your setup</Label>
+                  <Label>{t("Test your setup")}</Label>
                   {!apiUrl && (
                     <p className="text-xs text-onSurface-danger-primary">
-                      NEXT_PUBLIC_API_URL is not set. Set it in .env and restart
-                      before running this test.
+                      {t(
+                        "NEXT_PUBLIC_API_URL is not set. Set it in .env and restart before running this test.",
+                      )}
                     </p>
                   )}
                   <pre className="text-xs bg-surface-default-secondary p-3 rounded font-mono overflow-x-auto">{`curl -X POST ${apiUrl}/memories \\
@@ -728,28 +755,29 @@ export default function SetupPage() {
                       disabled={isLoading}
                       className="w-full"
                     >
-                      {isLoading ? "Testing..." : "Run Test"}
+                      {isLoading ? t("Testing...") : t("Run Test")}
                     </Button>
                     {error && (
                       <p className="text-xs text-onSurface-default-tertiary">
-                        Provider credentials or model wrong? Fix them in{" "}
+                        {t("Provider credentials or model wrong? Fix them in")}{" "}
                         <a
                           href="/dashboard/configuration"
                           className="underline underline-offset-4 hover:text-onSurface-default-primary"
                         >
-                          Configuration
+                          {t("Configuration")}
                         </a>{" "}
-                        and run the test again.
+                        {t("and run the test again.")}
                       </p>
                     )}
                   </>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm text-onSurface-positive-primary">
-                      <Check className="size-4" /> Memory created successfully
+                      <Check className="size-4" />{" "}
+                      {t("Memory created successfully")}
                     </div>
                     <Button type="submit" className="w-full">
-                      Go to Dashboard
+                      {t("Go to Dashboard")}
                     </Button>
                   </div>
                 )}

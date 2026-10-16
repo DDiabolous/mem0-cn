@@ -7,7 +7,7 @@ import { LinearProgress } from "@/components/ui/linearProgress";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 
-export const SIDEBAR_WIDTH = 180;
+export const SIDEBAR_WIDTH = 210;
 export const COLLAPSED_SIDEBAR_WIDTH = 64;
 export const COLLAPSED_SIDEBAR_PADDING = 16;
 export const COLLAPSED_SIDEBAR_WIDTH_WITHOUT_PADDING =

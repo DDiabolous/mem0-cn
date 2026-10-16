@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +18,8 @@ export function LockedPage({
   previewContent,
   utmMedium,
 }: LockedPageProps) {
+  const { t } = useLanguage();
+
   const utm = `utm_source=oss&utm_medium=${utmMedium}`;
   const cloudUrl = `https://app.mem0.ai?${utm}`;
   const salesUrl = `https://app.mem0.ai/enterprise?${utm}`;
@@ -41,18 +44,18 @@ export function LockedPage({
         <CardContent className="flex flex-col sm:flex-row items-center gap-4 py-6">
           <div className="flex-1">
             <p className="text-sm font-medium">
-              This feature is available in Mem0 Cloud and Enterprise.
+              {t("This feature is available in Mem0 Cloud and Enterprise.")}
             </p>
           </div>
           <div className="flex gap-3">
             <Button variant="default" asChild>
               <a href={cloudUrl} target="_blank" rel="noopener noreferrer">
-                Start free on Cloud
+                {t("Start free on Cloud")}
               </a>
             </Button>
             <Button variant="outline" asChild>
               <a href={salesUrl} target="_blank" rel="noopener noreferrer">
-                Talk to sales
+                {t("Talk to sales")}
               </a>
             </Button>
           </div>

@@ -1,7 +1,9 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
+import { zhCN as dateZhCN } from "date-fns/locale";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,6 +83,8 @@ const normalizeLog = (entry: ApiRequestLog): RequestLog => {
 };
 
 export default function RequestsPage() {
+  const { t, locale } = useLanguage();
+
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
@@ -116,17 +120,24 @@ export default function RequestsPage() {
   const columns = [
     {
       key: "createdAt" as keyof RequestLog,
-      label: "Time",
+      label: t("Time"),
       width: 140,
       render: (value: string) => (
-        <span title={format(new Date(value), "PPpp")}>
-          {formatDistanceToNow(new Date(value), { addSuffix: true })}
+        <span
+          title={format(new Date(value), "PPpp", {
+            locale: locale === "zh-CN" ? dateZhCN : undefined,
+          })}
+        >
+          {formatDistanceToNow(new Date(value), {
+            addSuffix: true,
+            locale: locale === "zh-CN" ? dateZhCN : undefined,
+          })}
         </span>
       ),
     },
     {
       key: "method" as keyof RequestLog,
-      label: "Method",
+      label: t("Method"),
       width: 96,
       render: (value: string) => (
         <Badge variant="outline" className={getMethodClassName(value)}>
@@ -136,7 +147,7 @@ export default function RequestsPage() {
     },
     {
       key: "path" as keyof RequestLog,
-      label: "Path",
+      label: t("Path"),
       width: 360,
       render: (value: string) => (
         <span className="font-mono text-xs break-all text-onSurface-default-primary">
@@ -146,7 +157,7 @@ export default function RequestsPage() {
     },
     {
       key: "statusCode" as keyof RequestLog,
-      label: "Status",
+      label: t("Status"),
       width: 120,
       render: (value: number) => (
         <Badge variant="outline" className={getStatusClassName(value)}>
@@ -156,15 +167,19 @@ export default function RequestsPage() {
     },
     {
       key: "latencyMs" as keyof RequestLog,
-      label: "Latency",
+      label: t("Latency"),
       width: 100,
-      render: (value: number) => <span>{value} ms</span>,
+      render: (value: number) => (
+        <span>
+          {value} {t("ms")}
+        </span>
+      ),
     },
     {
       key: "authType" as keyof RequestLog,
-      label: "Auth",
+      label: t("Auth"),
       width: 120,
-      render: (value: string) => getAuthLabel(value),
+      render: (value: string) => t(getAuthLabel(value)),
     },
   ];
 
@@ -172,14 +187,17 @@ export default function RequestsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-xl font-semibold font-fustat">Requests</h1>
+          <h1 className="text-xl font-semibold font-fustat">{t("Requests")}</h1>
           <p className="text-sm text-onSurface-default-secondary">
-            Recent request logs from your self-hosted instance.
+            {t("Recent request logs from your self-hosted instance.")}
           </p>
           {lastUpdated && (
             <p className="text-xs text-onSurface-default-tertiary">
-              Last updated{" "}
-              {formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })}
+              {t("Last updated")}{" "}
+              {formatDistanceToNow(new Date(lastUpdated), {
+                addSuffix: true,
+                locale: locale === "zh-CN" ? dateZhCN : undefined,
+              })}
             </p>
           )}
         </div>
@@ -192,19 +210,19 @@ export default function RequestsPage() {
           disabled={isLoading}
         >
           <RefreshCw className="size-4 mr-2" />
-          Refresh
+          {t("Refresh")}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {[
-          { label: "Total Requests", value: totalRequests },
+          { label: t("Total Requests"), value: totalRequests },
           {
-            label: "Success Rate",
+            label: t("Success Rate"),
             value: totalRequests > 0 ? `${successRate}%` : "--",
           },
           {
-            label: "Avg Latency",
+            label: t("Avg Latency"),
             value: totalRequests > 0 ? `${averageLatency} ms` : "--",
           },
         ].map((card) => (
@@ -231,8 +249,10 @@ export default function RequestsPage() {
         <TableSkeleton rows={6} columns={6} />
       ) : logs.length === 0 ? (
         <EmptyState
-          title="No request logs yet"
-          description="Requests will appear here once your instance receives traffic."
+          title={t("No request logs yet")}
+          description={t(
+            "Requests will appear here once your instance receives traffic.",
+          )}
           image="requests"
         />
       ) : (
@@ -247,8 +267,11 @@ export default function RequestsPage() {
           {logs.length > PAGE_SIZE && (
             <div className="flex items-center justify-between text-sm text-onSurface-default-tertiary">
               <span>
-                {page * PAGE_SIZE + 1}–
-                {Math.min((page + 1) * PAGE_SIZE, logs.length)} of {logs.length}
+                {t("{start}–{end} of {total}", {
+                  start: page * PAGE_SIZE + 1,
+                  end: Math.min((page + 1) * PAGE_SIZE, logs.length),
+                  total: logs.length,
+                })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -257,7 +280,7 @@ export default function RequestsPage() {
                   disabled={page === 0}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Previous
+                  {t("Previous")}
                 </Button>
                 <Button
                   variant="outline"
@@ -265,7 +288,7 @@ export default function RequestsPage() {
                   disabled={(page + 1) * PAGE_SIZE >= logs.length}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {t("Next")}
                 </Button>
               </div>
             </div>

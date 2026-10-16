@@ -84,7 +84,7 @@ const SidebarGroupLabel = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex w-full items-center gap-1 px-[6px] py-1 text-[10px] font-medium uppercase leading-[140%] text-onSurface-default-tertiary font-dm-mono",
+      "flex w-full items-center gap-1 px-[6px] py-1 text-[12px] font-medium uppercase leading-[140%] text-onSurface-default-tertiary font-dm-mono",
       className,
     )}
     {...props}

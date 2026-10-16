@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n";
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,8 @@ const DeleteConfirmationModal = ({
   itemName,
   confirmButtonText = "Delete",
 }: DeleteConfirmationModalProps) => {
+  const { t } = useLanguage();
+
   const [confirmationText, setConfirmationText] = useState("");
 
   const handleClose = () => {
@@ -49,12 +52,11 @@ const DeleteConfirmationModal = ({
 
         <div className="space-y-4">
           <p className="text-sm text-[#565553]">
-            Please type <span className="font-bold">{itemName}</span> to
-            confirm.
+            {t("Type {name} to confirm.", { name: itemName })}
           </p>
           <Input
             type="text"
-            placeholder="Enter name to confirm"
+            placeholder={t("Enter name to confirm")}
             value={confirmationText}
             onChange={(e) => setConfirmationText(e.target.value)}
             className="w-full"
@@ -63,14 +65,14 @@ const DeleteConfirmationModal = ({
 
         <div className="flex justify-end gap-2 mt-6">
           <Button onClick={handleClose} variant="outline">
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button
             onClick={handleConfirm}
             variant="destructive"
             disabled={!isDeleteEnabled}
           >
-            {confirmButtonText}
+            {t(confirmButtonText)}
           </Button>
         </div>
       </DialogContent>

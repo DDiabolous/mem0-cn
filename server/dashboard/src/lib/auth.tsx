@@ -1,4 +1,5 @@
 "use client";
+import { resetTemporaryAppearance } from "@/lib/appearance-session";
 
 import {
   createContext,
@@ -92,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await api.post(AUTH_ENDPOINTS.LOGIN, { email, password });
       setAccessToken(res.data.access_token);
       await storeRefreshToken(res.data.refresh_token);
+      resetTemporaryAppearance();
       await loadUser();
     },
     [loadUser],
@@ -106,12 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       setAccessToken(res.data.access_token);
       await storeRefreshToken(res.data.refresh_token);
+      resetTemporaryAppearance();
       await loadUser();
     },
     [loadUser],
   );
 
   const logout = useCallback(async () => {
+    resetTemporaryAppearance();
     await clearRefreshToken();
     setAccessToken(null);
     setUser(null);

@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -31,6 +32,8 @@ const PAGE_SIZE = 20;
 const MEMORY_FETCH_LIMIT = 1000;
 
 export default function MemoriesPage() {
+  const { t, locale } = useLanguage();
+
   const [userId, setUserId] = useState("");
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [memoryToDelete, setMemoryToDelete] = useState<Memory | null>(null);
@@ -63,13 +66,13 @@ export default function MemoriesPage() {
     if (!memoryToDelete) return;
     try {
       await api.delete(MEMORY_ENDPOINTS.BY_ID(memoryToDelete.id));
-      toast({ title: "Memory deleted", variant: "success" });
+      toast({ title: t("Memory deleted"), variant: "success" });
       if (selectedMemory?.id === memoryToDelete.id) setSelectedMemory(null);
       setMemoryToDelete(null);
       void refetch();
     } catch (error) {
       toast({
-        title: "Failed to delete memory",
+        title: t("Failed to delete memory"),
         description: getErrorMessage(error),
         variant: "destructive",
       });
@@ -79,32 +82,39 @@ export default function MemoriesPage() {
   const columns = [
     {
       key: "memory" as keyof Memory,
-      label: "Content",
+      label: t("Content"),
       width: 400,
       render: (value: string) => (
         <span className="line-clamp-2 text-sm">{value}</span>
       ),
     },
-    { key: "user_id" as keyof Memory, label: "User", width: 100 },
-    { key: "agent_id" as keyof Memory, label: "Agent", width: 100 },
+    { key: "user_id" as keyof Memory, label: t("User"), width: 100 },
+    { key: "agent_id" as keyof Memory, label: t("Agent"), width: 100 },
     {
       key: "created_at" as keyof Memory,
-      label: "Created",
+      label: t("Created"),
       width: 120,
       render: (value: string) =>
-        value ? format(new Date(value), "MMM d, yyyy") : "--",
+        value
+          ? format(
+              new Date(value),
+              locale === "zh-CN" ? "yyyy年M月d日" : "MMM d, yyyy",
+            )
+          : "--",
     },
   ];
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold font-fustat">Memories</h1>
+      <h1 className="text-xl font-semibold font-fustat">{t("Memories")}</h1>
 
       {memories.length >= MEMORY_FETCH_LIMIT && (
         <UpgradeBanner
           id="memories-1k"
-          message="1,000+ memories stored. Categories can help organize them."
-          ctaLabel="Explore Cloud"
+          message={t(
+            "1,000+ memories stored. Categories can help organize them.",
+          )}
+          ctaLabel={t("Explore Cloud")}
           ctaUrl="https://app.mem0.ai?utm_source=oss&utm_medium=dashboard-memories"
           variant="cloud"
         />
@@ -112,7 +122,7 @@ export default function MemoriesPage() {
 
       <div className="flex gap-3">
         <Input
-          placeholder="Filter by User ID (optional)"
+          placeholder={t("Filter by User ID (optional)")}
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
           onKeyDown={(e) => {
@@ -129,8 +139,10 @@ export default function MemoriesPage() {
         <TableSkeleton rows={5} columns={4} />
       ) : memories.length === 0 ? (
         <EmptyState
-          title="No memories yet"
-          description="Create your first memory by sending a POST /memories request."
+          title={t("No memories yet")}
+          description={t(
+            "Create your first memory by sending a POST /memories request.",
+          )}
         >
           <pre className="text-xs text-left bg-surface-default-secondary p-3 rounded font-mono overflow-x-auto mt-3 max-w-lg">
             {`curl -X POST ${apiUrl}/memories \\
@@ -144,7 +156,7 @@ export default function MemoriesPage() {
             rel="noopener noreferrer"
             className="text-xs text-onSurface-default-tertiary underline underline-offset-4 hover:text-onSurface-default-primary mt-2"
           >
-            REST API reference
+            {t("REST API reference")}
           </a>
         </EmptyState>
       ) : (
@@ -165,9 +177,11 @@ export default function MemoriesPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between text-sm text-onSurface-default-tertiary">
               <span>
-                {page * PAGE_SIZE + 1}–
-                {Math.min((page + 1) * PAGE_SIZE, memories.length)} of{" "}
-                {memories.length}
+                {t("{start}–{end} of {total}", {
+                  start: page * PAGE_SIZE + 1,
+                  end: Math.min((page + 1) * PAGE_SIZE, memories.length),
+                  total: memories.length,
+                })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -176,7 +190,7 @@ export default function MemoriesPage() {
                   disabled={page === 0}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Previous
+                  {t("Previous")}
                 </Button>
                 <Button
                   variant="outline"
@@ -184,7 +198,7 @@ export default function MemoriesPage() {
                   disabled={page >= totalPages - 1}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {t("Next")}
                 </Button>
               </div>
             </div>
@@ -200,23 +214,23 @@ export default function MemoriesPage() {
       >
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>Memory Detail</SheetTitle>
+            <SheetTitle>{t("Memory Detail")}</SheetTitle>
             <SheetDescription className="sr-only">
-              View memory content and metadata
+              {t("View memory content and metadata")}
             </SheetDescription>
           </SheetHeader>
           {selectedMemory && (
             <div className="mt-6 space-y-4">
               <div className="space-y-1">
                 <Label className="text-xs text-onSurface-default-tertiary">
-                  Content
+                  {t("Content")}
                 </Label>
                 <p className="text-sm">{selectedMemory.memory}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs text-onSurface-default-tertiary">
-                    ID
+                    {t("ID")}
                   </Label>
                   <p className="text-xs font-mono break-all">
                     {selectedMemory.id}
@@ -225,7 +239,7 @@ export default function MemoriesPage() {
                 {selectedMemory.user_id && (
                   <div className="space-y-1">
                     <Label className="text-xs text-onSurface-default-tertiary">
-                      User
+                      {t("User")}
                     </Label>
                     <p className="text-sm">{selectedMemory.user_id}</p>
                   </div>
@@ -233,7 +247,7 @@ export default function MemoriesPage() {
                 {selectedMemory.agent_id && (
                   <div className="space-y-1">
                     <Label className="text-xs text-onSurface-default-tertiary">
-                      Agent
+                      {t("Agent")}
                     </Label>
                     <p className="text-sm">{selectedMemory.agent_id}</p>
                   </div>
@@ -241,10 +255,12 @@ export default function MemoriesPage() {
                 {selectedMemory.created_at && (
                   <div className="space-y-1">
                     <Label className="text-xs text-onSurface-default-tertiary">
-                      Created
+                      {t("Created")}
                     </Label>
                     <p className="text-sm">
-                      {new Date(selectedMemory.created_at).toLocaleString()}
+                      {new Date(selectedMemory.created_at).toLocaleString(
+                        locale,
+                      )}
                     </p>
                   </div>
                 )}
@@ -256,7 +272,7 @@ export default function MemoriesPage() {
                 onClick={() => setMemoryToDelete(selectedMemory)}
               >
                 <Trash2 className="size-3.5 mr-1" />
-                Delete memory
+                {t("Delete memory")}
               </Button>
             </div>
           )}
@@ -267,8 +283,10 @@ export default function MemoriesPage() {
         isOpen={!!memoryToDelete}
         onClose={() => setMemoryToDelete(null)}
         onConfirm={handleDelete}
-        title="Delete memory"
-        description="This memory will be permanently removed. This cannot be undone."
+        title={t("Delete memory")}
+        description={t(
+          "This memory will be permanently removed. This cannot be undone.",
+        )}
         itemName={memoryToDelete?.id ?? ""}
         confirmButtonText="Delete"
       />

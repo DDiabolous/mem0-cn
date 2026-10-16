@@ -35,12 +35,12 @@ const buttonVariants = cva(
           "bg-surface-default-brand text-onSurface-default-primary hover:bg-surface-default-brand-hover",
       },
       size: {
-        default: "h-9 px-4 py-2",
+        default: "h-10 px-4 py-2",
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-lg px-8",
         icon: "size-9",
         xl: "h-16 rounded-md px-5 ",
-        xs: "h-[30px] px-3 text-[10px]",
+        xs: "h-[30px] px-3 text-[12px]",
       },
     },
     defaultVariants: {

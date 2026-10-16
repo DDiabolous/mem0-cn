@@ -10,6 +10,7 @@ import { Provider } from "react-redux";
 import store from "@/store/store";
 import { AuthProvider } from "@/lib/auth";
 import dynamic from "next/dynamic";
+import { LanguageProvider } from "@/lib/i18n";
 
 const Toaster = dynamic(
   () =>
@@ -36,19 +37,21 @@ export function DashboardClientLayout({
         )}
         suppressHydrationWarning
       >
-        <Provider store={store}>
-          <AuthProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="light"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <ClientLayout>{children}</ClientLayout>
-              <Toaster />
-            </ThemeProvider>
-          </AuthProvider>
-        </Provider>
+        <LanguageProvider>
+          <Provider store={store}>
+            <AuthProvider>
+              <ThemeProvider
+                attribute="class"
+                defaultTheme="light"
+                enableSystem
+                disableTransitionOnChange
+              >
+                <ClientLayout>{children}</ClientLayout>
+                <Toaster />
+              </ThemeProvider>
+            </AuthProvider>
+          </Provider>
+        </LanguageProvider>
       </body>
     </html>
   );

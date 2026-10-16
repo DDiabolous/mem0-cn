@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -25,6 +26,8 @@ const RESET_COMMAND =
   "make reset-admin-password EMAIL=<your-email> PASSWORD=<new-password>";
 
 export default function LoginForm() {
+  const { t } = useLanguage();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading, login } = useAuth();
@@ -52,7 +55,7 @@ export default function LoginForm() {
     e.preventDefault();
     setError("");
     if (!emailValid) {
-      setError("Enter a valid email address.");
+      setError(t("Enter a valid email address."));
       return;
     }
     setSubmitting(true);
@@ -60,7 +63,7 @@ export default function LoginForm() {
       await login(email, password);
       router.push(searchParams.get("next") || "/dashboard/requests");
     } catch (err) {
-      setError(getErrorMessage(err, "Login failed"));
+      setError(getErrorMessage(err, t("Login failed")));
     } finally {
       setSubmitting(false);
     }
@@ -85,7 +88,7 @@ export default function LoginForm() {
             )}
           </div>
           <h1 className="text-2xl font-semibold text-onSurface-default-primary text-center mb-6 font-fustat">
-            Sign in to Mem0
+            {t("Sign in to Mem0")}
           </h1>
           <div className="flex flex-col gap-4 border p-8 border-memBorder-primary rounded-xl">
             {error && (
@@ -95,7 +98,7 @@ export default function LoginForm() {
             )}
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="login-email">Email</Label>
+                <Label htmlFor="login-email">{t("Email")}</Label>
                 <Input
                   id="login-email"
                   type="email"
@@ -107,7 +110,7 @@ export default function LoginForm() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="login-password">Password</Label>
+                <Label htmlFor="login-password">{t("Password")}</Label>
                 <Input
                   id="login-password"
                   type="password"
@@ -123,7 +126,7 @@ export default function LoginForm() {
                 size="lg"
                 className="w-full"
               >
-                {submitting ? "Signing in..." : "Sign in"}
+                {submitting ? t("Signing in...") : t("Sign in")}
               </Button>
             </form>
             <Dialog>
@@ -132,16 +135,16 @@ export default function LoginForm() {
                   type="button"
                   className="text-xs text-onSurface-default-tertiary hover:text-onSurface-default-primary underline underline-offset-4 self-center"
                 >
-                  Forgot password?
+                  {t("Forgot password?")}
                 </button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Reset your admin password</DialogTitle>
+                  <DialogTitle>{t("Reset your admin password")}</DialogTitle>
                   <DialogDescription>
-                    Run this command on the server host. It overwrites the
-                    existing password; anyone already signed in stays signed in
-                    until their session expires.
+                    {t(
+                      "Run this command on the server host. It overwrites the existing password; anyone already signed in stays signed in until their session expires.",
+                    )}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex gap-2">
@@ -177,13 +180,16 @@ export default function LoginForm() {
         <div className="relative z-10 flex w-full max-w-[564px] flex-col items-center gap-20 text-center text-white">
           <div className="w-full space-y-5">
             <p className="typo-h3 text-white">
-              &quot;Mem0 allowed us to unlock true personalized tutoring for
-              every student, and it took us just a weekend to integrate.&quot;
+              {t(
+                '"Mem0 allowed us to unlock true personalized tutoring for every student, and it took us just a weekend to integrate."',
+              )}
             </p>
             <div className="flex flex-col items-center gap-[7px]">
               <div className="flex flex-col items-center gap-1">
                 <p className="typo-body-sm text-white">Michael Tong</p>
-                <p className="typo-body-xs text-white">CTO, RevisionDojo</p>
+                <p className="typo-body-xs text-white">
+                  {t("CTO, RevisionDojo")}
+                </p>
               </div>
               <Image
                 src="/images/micheal.png"
@@ -195,7 +201,9 @@ export default function LoginForm() {
             </div>
           </div>
           <div className="flex w-full flex-col items-center gap-3">
-            <p className="typo-body text-white">Trusted by 100k+ Developers</p>
+            <p className="typo-body text-white">
+              {t("Trusted by 100k+ Developers")}
+            </p>
             <div className="flex items-center justify-center gap-8 text-white">
               <div className="h-6 shrink-0">
                 <Image

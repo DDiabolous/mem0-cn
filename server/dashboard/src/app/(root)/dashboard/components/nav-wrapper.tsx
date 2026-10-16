@@ -1,6 +1,9 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { MainNav } from "./main-nav";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PanelRight, LogOut, Settings, HelpCircle } from "lucide-react";
 import { useCallback } from "react";
 import {
@@ -29,6 +32,8 @@ import Link from "next/link";
 import { Building2 } from "lucide-react";
 
 export default function NavWrapper() {
+  const { t } = useLanguage();
+
   const dispatch = useDispatch();
   const isSidebarCollapsed = useSelector(
     (state: RootState) => state.layout.isSidebarCollapsed,
@@ -115,7 +120,7 @@ export default function NavWrapper() {
                   >
                     <Link href="/dashboard/settings">
                       <Settings className="size-4 mr-2" />
-                      Settings
+                      {t("Settings")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-memBorder-primary" />
@@ -124,7 +129,7 @@ export default function NavWrapper() {
                     className="typo-body-sm text-onSurface-default-primary hover:bg-surface-default-tertiary-hover focus:bg-surface-default-tertiary-hover cursor-pointer"
                   >
                     <LogOut className="size-4 mr-2" />
-                    Log out
+                    {t("Log out")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -146,7 +151,7 @@ export default function NavWrapper() {
             onClick={handleToggle}
             className="cursor-pointer text-onSurface-default-tertiary hover:text-onSurface-default-secondary"
             aria-label={
-              isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+              isSidebarCollapsed ? t("Expand sidebar") : t("Collapse sidebar")
             }
           >
             <PanelRight className="size-4" />
@@ -154,6 +159,8 @@ export default function NavWrapper() {
         </div>
 
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
+          <ThemeToggle />
           <Tooltip>
             <TooltipTrigger asChild>
               <a
@@ -165,7 +172,7 @@ export default function NavWrapper() {
                 <HelpCircle className="size-4 shrink-0" />
               </a>
             </TooltipTrigger>
-            <TooltipContent>Documentation</TooltipContent>
+            <TooltipContent>{t("Documentation")}</TooltipContent>
           </Tooltip>
         </div>
       </div>

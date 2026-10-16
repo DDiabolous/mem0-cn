@@ -184,19 +184,19 @@
     --typo-body-lg-line: 22px;
     --typo-body-lg-tracking: 0;
     --typo-body-size: 16px;
-    --typo-body-line: 22px;
+    --typo-body-line: 24px;
     --typo-body-tracking: 0;
-    --typo-body-sm-size: 14px;
-    --typo-body-sm-line: 18px;
+    --typo-body-sm-size: 16px;
+    --typo-body-sm-line: 24px;
     --typo-body-sm-tracking: 0;
-    --typo-body-xs-size: 12px;
-    --typo-body-xs-line: 16px;
+    --typo-body-xs-size: 14px;
+    --typo-body-xs-line: 20px;
     --typo-body-xs-tracking: 0;
     --typo-caption-size: 12px;
     --typo-caption-line: 16px;
     --typo-caption-tracking: 0.05em;
-    --typo-caption-sm-size: 10px;
-    --typo-caption-sm-line: 12px;
+    --typo-caption-sm-size: 12px;
+    --typo-caption-sm-line: 16px;
     --typo-caption-sm-tracking: 0.05em;
     --typo-overline-size: 14px;
     --typo-overline-line: 16px;
@@ -553,4 +553,19 @@
 
 .dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+/* Reveal the new theme in a circular arc from the header switch. */
+html.theme-transition::view-transition-old(root),
+html.theme-transition::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.theme-transition::view-transition-old(root) {
+  z-index: 1;
+}
+
+html.theme-transition::view-transition-new(root) {
+  z-index: 2;
 }

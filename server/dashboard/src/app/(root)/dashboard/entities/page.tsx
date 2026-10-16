@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -18,6 +19,8 @@ import { useApiQuery } from "@/hooks/use-api-query";
 import { Entity } from "@/types/api";
 
 export default function EntitiesPage() {
+  const { t, locale } = useLanguage();
+
   const [entityToDelete, setEntityToDelete] = useState<Entity | null>(null);
 
   const {
@@ -38,12 +41,12 @@ export default function EntitiesPage() {
       await api.delete(
         ENTITY_ENDPOINTS.BY_ID(entityToDelete.type, entityToDelete.id),
       );
-      toast({ title: "Entity deleted", variant: "success" });
+      toast({ title: t("Entity deleted"), variant: "success" });
       setEntityToDelete(null);
       void refetch();
     } catch (error) {
       toast({
-        title: "Failed to delete entity",
+        title: t("Failed to delete entity"),
         description: getErrorMessage(error),
         variant: "destructive",
       });
@@ -53,7 +56,7 @@ export default function EntitiesPage() {
   const columns = [
     {
       key: "type" as keyof Entity,
-      label: "Type",
+      label: t("Type"),
       width: 100,
       render: (value: Entity["type"]) => (
         <Badge variant="outline" className="capitalize">
@@ -63,7 +66,7 @@ export default function EntitiesPage() {
     },
     {
       key: "id" as keyof Entity,
-      label: "ID",
+      label: t("ID"),
       width: 280,
       render: (value: string) => (
         <span className="font-mono text-sm truncate">{value}</span>
@@ -71,16 +74,21 @@ export default function EntitiesPage() {
     },
     {
       key: "total_memories" as keyof Entity,
-      label: "Memories",
+      label: t("Memories"),
       width: 100,
       align: "right" as const,
     },
     {
       key: "updated_at" as keyof Entity,
-      label: "Last Active",
+      label: t("Last Active"),
       width: 140,
       render: (value: string | null) =>
-        value ? format(new Date(value), "MMM d, yyyy") : "--",
+        value
+          ? format(
+              new Date(value),
+              locale === "zh-CN" ? "yyyy年M月d日" : "MMM d, yyyy",
+            )
+          : "--",
     },
     {
       key: "id" as keyof Entity,
@@ -101,14 +109,16 @@ export default function EntitiesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold font-fustat">Entities</h1>
+      <h1 className="text-xl font-semibold font-fustat">{t("Entities")}</h1>
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={5} />
       ) : entities.length === 0 ? (
         <EmptyState
-          title="No entities yet"
-          description="Entities appear once memories are stored with a user_id, agent_id, or run_id."
+          title={t("No entities yet")}
+          description={t(
+            "Entities appear once memories are stored with a user_id, agent_id, or run_id.",
+          )}
         />
       ) : (
         <Card className="border-memBorder-primary overflow-hidden">
@@ -124,8 +134,10 @@ export default function EntitiesPage() {
         isOpen={!!entityToDelete}
         onClose={() => setEntityToDelete(null)}
         onConfirm={handleDelete}
-        title="Delete entity"
-        description="All memories associated with this entity will be permanently removed. This cannot be undone."
+        title={t("Delete entity")}
+        description={t(
+          "All memories associated with this entity will be permanently removed. This cannot be undone.",
+        )}
         itemName={entityToDelete?.id ?? ""}
         confirmButtonText="Delete"
       />

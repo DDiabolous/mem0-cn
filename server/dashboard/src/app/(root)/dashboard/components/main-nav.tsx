@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import * as React from "react";
 import Link from "next/link";
@@ -40,6 +41,8 @@ export function MainNav({
   className,
   ...props
 }: React.HTMLAttributes<HTMLElement>) {
+  const { t } = useLanguage();
+
   const pathname = usePathname();
   const isSidebarCollapsed = useSelector(
     (state: RootState) => state.layout.isSidebarCollapsed,
@@ -59,24 +62,24 @@ export function MainNav({
               <div className="flex flex-col gap-0">
                 {!isSidebarCollapsed && (
                   <SidebarGroupLabel className="mb-0">
-                    ACTIVITY
+                    {t("ACTIVITY")}
                   </SidebarGroupLabel>
                 )}
                 {[
                   {
-                    title: "Requests",
+                    title: t("Requests"),
                     url: "/dashboard/requests",
                     icon: Activity,
                     active: pathname === "/dashboard/requests",
                   },
                   {
-                    title: "Memories",
+                    title: t("Memories"),
                     url: "/dashboard/memories",
                     icon: GalleryVerticalEnd,
                     active: pathname === "/dashboard/memories",
                   },
                   {
-                    title: "Entities",
+                    title: t("Entities"),
                     url: "/dashboard/entities",
                     icon: Users,
                     active: pathname === "/dashboard/entities",
@@ -118,7 +121,7 @@ export function MainNav({
                 {!isSidebarCollapsed && (
                   <CollapsibleTrigger asChild>
                     <SidebarGroupLabel className="cursor-pointer mb-0">
-                      CLOUD FEATURES
+                      {t("CLOUD FEATURES")}
                       <ChevronDown
                         className={cn(
                           "size-3 transition-transform duration-200",
@@ -131,22 +134,22 @@ export function MainNav({
                 <CollapsibleContent className="flex flex-col gap-0">
                   {[
                     {
-                      title: "Categories",
+                      title: t("Categories"),
                       url: "/dashboard/categories",
                       icon: Tags,
                     },
                     {
-                      title: "Webhooks",
+                      title: t("Webhooks"),
                       url: "/dashboard/webhooks",
                       icon: WebhookIcon,
                     },
                     {
-                      title: "Analytics",
+                      title: t("Analytics"),
                       url: "/dashboard/analytics",
                       icon: ChartLine,
                     },
                     {
-                      title: "Export",
+                      title: t("Export"),
                       url: "/dashboard/export",
                       icon: FolderInput,
                     },
@@ -170,12 +173,14 @@ export function MainNav({
                           <item.icon className="size-4 shrink-0" />
                           {!isSidebarCollapsed && (
                             <>
-                              <span>{item.title}</span>
+                              <span className="whitespace-nowrap">
+                                {item.title}
+                              </span>
                               <Badge
                                 variant="outline"
-                                className="ml-auto text-memGold-600 border-memGold-300 typo-caption-sm px-1.5 py-0"
+                                className="ml-auto shrink-0 whitespace-nowrap text-memGold-600 border-memGold-300 typo-caption-sm px-1.5 py-0"
                               >
-                                PRO
+                                {t("PRO")}
                               </Badge>
                             </>
                           )}
@@ -193,24 +198,24 @@ export function MainNav({
               <div className="flex flex-col gap-0">
                 {!isSidebarCollapsed && (
                   <SidebarGroupLabel className="mb-0">
-                    ACCOUNT
+                    {t("ACCOUNT")}
                   </SidebarGroupLabel>
                 )}
                 {[
                   {
-                    title: "API Keys",
+                    title: t("API Keys"),
                     url: "/dashboard/api-keys",
                     icon: KeyRound,
                     active: pathname === "/dashboard/api-keys",
                   },
                   {
-                    title: "Configuration",
+                    title: t("Configuration"),
                     url: "/dashboard/configuration",
                     icon: Wrench,
                     active: pathname === "/dashboard/configuration",
                   },
                   {
-                    title: "Settings",
+                    title: t("Settings"),
                     url: "/dashboard/settings",
                     icon: Settings,
                     active: pathname === "/dashboard/settings",

@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/lib/i18n";
 
 import { LockedPage } from "@/components/self-hosted/locked-page";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,10 +26,14 @@ function CategoriesMockup() {
 }
 
 export default function CategoriesPage() {
+  const { t } = useLanguage();
+
   return (
     <LockedPage
-      title="Custom Categories"
-      description="Organize memories by domain -- health, preferences, work, and more."
+      title={t("Custom Categories")}
+      description={t(
+        "Organize memories by domain -- health, preferences, work, and more.",
+      )}
       previewContent={<CategoriesMockup />}
       utmMedium="dashboard-locked-categories"
     />

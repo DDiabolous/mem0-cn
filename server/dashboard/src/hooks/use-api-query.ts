@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { getErrorMessage } from "@/lib/error-message";
+import { useLanguage } from "@/lib/i18n";
 
 interface UseApiQueryOptions<T> {
   enabled?: boolean;
@@ -19,6 +20,9 @@ export function useApiQuery<T>(
   fetcher: () => Promise<T>,
   options: UseApiQueryOptions<T> = {},
 ): UseApiQueryResult<T> {
+  const { t } = useLanguage();
+  const translateRef = useRef(t);
+  translateRef.current = t;
   const { enabled = true, errorToast, initialData } = options;
 
   const [data, setData] = useState<T | undefined>(initialData);
@@ -34,11 +38,14 @@ export function useApiQuery<T>(
     try {
       setData(await fetcherRef.current());
     } catch (err) {
-      const message = getErrorMessage(err, errorToast || "Request failed");
+      const message = getErrorMessage(
+        err,
+        translateRef.current(errorToast || "Request failed"),
+      );
       setError(message);
       if (errorToast) {
         toast({
-          title: errorToast,
+          title: translateRef.current(errorToast),
           description: message,
           variant: "destructive",
         });

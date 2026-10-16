@@ -25,6 +25,12 @@ const config = {
       },
     },
     extend: {
+      // Shared interface sizes: readable labels and full-size body text.
+      fontSize: {
+        xs: ["0.875rem", { lineHeight: "1.25rem" }],
+        sm: ["1rem", { lineHeight: "1.5rem" }],
+        xl: ["1.5rem", { lineHeight: "2rem" }],
+      },
       spacing: {
         "2.5": "0.625rem",
       },
