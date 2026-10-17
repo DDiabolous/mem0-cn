@@ -122,7 +122,7 @@ DEFAULT_EMBEDDER_PROVIDER = os.getenv("MEM0_DEFAULT_EMBEDDER_PROVIDER") or (
     "dashscope" if os.getenv("DASHSCOPE_API_KEY") else "openai"
 )
 DEFAULT_LLM_MODEL = os.getenv("MEM0_DEFAULT_LLM_MODEL") or (
-    "qwen3.6-flash" if DEFAULT_LLM_PROVIDER == "dashscope" else "gpt-5-mini"
+    "qwen3.8-flash" if DEFAULT_LLM_PROVIDER == "dashscope" else "gpt-5-mini"
 )
 DEFAULT_EMBEDDER_MODEL = os.getenv("MEM0_DEFAULT_EMBEDDER_MODEL") or (
     "qwen3.7-text-embedding-flash" if DEFAULT_EMBEDDER_PROVIDER == "dashscope" else "text-embedding-3-small"
@@ -161,10 +161,8 @@ if os.getenv("MEM0_RERANK_ENABLED", "false").lower() == "true":
         },
     }
 
-
 set_session_factory(SessionLocal)
 initialize_state(DEFAULT_CONFIG)
-
 
 app = FastAPI(
     title="Mem0 REST APIs",
@@ -229,7 +227,8 @@ class SearchRequest(BaseModel):
     explain: Optional[bool] = Field(None, description="Include score details for each search result.")
     show_expired: Optional[bool] = Field(None, description="Include expired memories.")
     rerank: bool = Field(False, description="Rerank with the configured reranker.")
-    candidate_k: Optional[int] = Field(None, ge=1, le=100, description="Candidates before reranking; requires rerank=true.")
+    candidate_k: Optional[int] = Field(None, ge=1, le=100,
+                                       description="Candidates before reranking; requires rerank=true.")
 
 
 class GenerateInstructionsRequest(BaseModel):
@@ -268,14 +267,15 @@ def _validate_bundled_providers(config: Dict[str, Any]) -> None:
         )
 
     reranker = config.get("reranker")
-    if isinstance(reranker, dict) and (provider := reranker.get("provider")) and provider not in BUNDLED_RERANKER_PROVIDERS:
+    if isinstance(reranker, dict) and (
+    provider := reranker.get("provider")) and provider not in BUNDLED_RERANKER_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Reranker provider '{provider}' is not bundled in this image.")
 
     embedder = config.get("embedder")
     if (
-        isinstance(embedder, dict)
-        and (provider := embedder.get("provider"))
-        and provider not in BUNDLED_EMBEDDER_PROVIDERS
+            isinstance(embedder, dict)
+            and (provider := embedder.get("provider"))
+            and provider not in BUNDLED_EMBEDDER_PROVIDERS
     ):
         raise HTTPException(
             status_code=400,
@@ -382,7 +382,11 @@ def generate_instructions(req: GenerateInstructionsRequest, _auth=Depends(verify
     try:
         llm = get_memory_instance().llm
         prompt = (
-            "You are configuring a memory system. Given the use case below, produce two things:\n"
+            "You are configuring a memory system. Detect the language of the user's use case below. "
+            "Write both INSTRUCTIONS and TEST_MESSAGE in that language. "
+            "If multiple languages are used, follow the predominant language of the use case. "
+            "Keep the labels INSTRUCTIONS: and TEST_MESSAGE: unchanged.\n"
+            "Given the use case below, produce two things:\n"
             "1. INSTRUCTIONS: A short paragraph of custom instructions telling the memory extraction system "
             "what kinds of facts, preferences, and context to prioritize. Be specific to the use case.\n"
             "2. TEST_MESSAGE: A single realistic sentence a user in this use case would say, suitable for "
@@ -422,7 +426,8 @@ def add_memory(memory_create: MemoryCreate, _auth=Depends(verify_auth)):
 
 
 ALL_MEMORIES_LIMIT = 1000
-_RESERVED_PAYLOAD_KEYS = {"data", "user_id", "agent_id", "run_id", "hash", "created_at", "updated_at", "expiration_date"}
+_RESERVED_PAYLOAD_KEYS = {"data", "user_id", "agent_id", "run_id", "hash", "created_at", "updated_at",
+                          "expiration_date"}
 
 
 def _serialize_memory(row: Any) -> Dict[str, Any]:
@@ -449,13 +454,13 @@ def _list_all_memories(limit: int = ALL_MEMORIES_LIMIT) -> Dict[str, Any]:
 
 @app.get("/memories", summary="Get memories")
 def get_all_memories(
-    request: Request,
-    user_id: Optional[str] = None,
-    run_id: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    top_k: Optional[int] = Query(None, ge=0, le=ALL_MEMORIES_LIMIT),
-    show_expired: bool = Query(False),
-    _auth=Depends(verify_auth),
+        request: Request,
+        user_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        top_k: Optional[int] = Query(None, ge=0, le=ALL_MEMORIES_LIMIT),
+        show_expired: bool = Query(False),
+        _auth=Depends(verify_auth),
 ):
     """Retrieve stored memories. Lists all memories when no identifier is provided (admin only)."""
     try:
@@ -580,10 +585,10 @@ def delete_memory(memory_id: str, _auth=Depends(verify_auth)):
 
 @app.delete("/memories", summary="Delete all memories", response_model=MessageResponse)
 def delete_all_memories(
-    user_id: Optional[str] = None,
-    run_id: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    _auth=Depends(require_admin),
+        user_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        _auth=Depends(require_admin),
 ):
     """Delete all memories for a given identifier. Requires admin role."""
     if not any([user_id, run_id, agent_id]):

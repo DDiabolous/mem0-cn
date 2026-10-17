@@ -15,7 +15,7 @@ class DashScopeLLM(OpenAILLM):
         elif isinstance(config, dict):
             config = DashScopeConfig(**config)
         LLMBase.__init__(self, config)
-        self.config.model = self.config.model or "qwen3.6-flash"
+        self.config.model = self.config.model or "qwen3.8-flash"
         self.client = OpenAI(
             api_key=dashscope_api_key(self.config.api_key),
             base_url=dashscope_base_url(self.config.base_url),

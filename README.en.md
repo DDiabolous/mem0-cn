@@ -14,7 +14,7 @@ The underlying memory engine and most integrations come from upstream Mem0. Fork
 - **Bilingual dashboard:** top-right switches temporarily change language and theme; Settings → Appearance saves defaults, initially following the system.
 - **User and device scoping:** use `user_id` for users and `agent_id` for devices in both writes and searches.
 - **PostgreSQL + pgvector:** reuse an existing database, with a 1024-dimensional embedding configuration in the current server defaults.
-- **Deployment configuration:** keep public URLs, host ports, credentials, and database settings in `.env`. Git and Docker ignore local environment files and runtime history.
+- **Deployment configuration:** keep credentials and real endpoints in `.env`; only these support safe Compose fallbacks and `.env` overrides. Edit ordinary ports, images, models, and flags directly in Compose. Git and Docker ignore local environment files and runtime history.
 - **Python package mirror:** server Dockerfiles use the Tsinghua PyPI mirror. Docker base images still come from their configured registries.
 
 Only DashScope-specific additions are described here; this is not a claim of compatibility with every Chinese model provider or domestic hardware platform.
@@ -22,10 +22,10 @@ Only DashScope-specific additions are described here; this is not a claim of com
 ## Requirements
 
 - Docker Engine or Docker Desktop with Docker Compose.
-- An existing PostgreSQL instance with pgvector installed.
+- PostgreSQL with pgvector: started by Compose by default, or reuse an existing instance.
 - A DashScope API key and the base URL for its workspace and region.
 
-The current Compose file runs the Mem0 API and dashboard. It does **not** start PostgreSQL.
+The default Compose file starts the API, PostgreSQL, and dashboard, matching upstream. Use the standalone `server/docker-compose.host-db.yaml` to connect to an existing host database instead.
 
 ## Quick start
 
@@ -37,9 +37,61 @@ cd mem0-cn/server
 cp .env.example .env
 ```
 
-### 2. Prepare PostgreSQL
+### 2. Choose a database method
 
-Connect as a PostgreSQL administrator and create the databases if they do not already exist:
+| Setting | Method A: Compose database (default, matching upstream) | Method B: existing host database |
+| --- | --- | --- |
+| Compose file | `docker-compose.yaml` | `docker-compose.host-db.yaml` (standalone) |
+| Services | API, PostgreSQL, dashboard | API and dashboard only |
+| Startup | `docker compose up -d --build` | `docker compose -f docker-compose.host-db.yaml up -d --build` |
+| `POSTGRES_HOST` | `postgres` (service name) | `host.docker.internal` |
+| `POSTGRES_PORT` | `5432` (internal database port) | Existing server port |
+| Persistence | Named volume `postgres_db` | Existing database directory |
+| Initialization | Automatic databases and vector extension | Administrator prepares the existing instance |
+
+Keep actual database hosts and credentials in `.env`; hosts override safe Compose fallbacks. Ports, database names, and collection names are ordinary settings edited directly in Compose. `POSTGRES_DB` stores memories and vectors; `APP_DB_NAME` stores accounts, API keys, and configuration.
+
+#### Method A: default Compose with PostgreSQL
+
+The default preserves upstream's three services, `postgres_db` volume, and initialization-script mount. The API waits for PostgreSQL health before migrations; fresh deployments require no manual database SQL.
+
+Set `server/.env`:
+
+```dotenv
+POSTGRES_HOST=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=REPLACE_WITH_NEW_DB_PASSWORD
+```
+
+Edit image, shared memory, and host-port mapping directly in Compose:
+
+```yaml
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    shm_size: 128mb
+    ports:
+      - "8432:5432"
+```
+
+This is an excerpt, not the whole file. Keep API and PostgreSQL `POSTGRES_DB=postgres` and `APP_DB_NAME=mem0_app` in sync when editing the default deployment. The image contains PostgreSQL 17 and pgvector; no separate plain `postgres` image is needed. See the [official pgvector image documentation](https://github.com/pgvector/pgvector#docker). Credentials must be supplied in `.env`, not committed to Compose.
+
+- An empty volume's first startup creates `POSTGRES_USER` and `POSTGRES_DB`; `init-db.sh` creates `APP_DB_NAME` and enables vector in the memory database.
+- Host tools use port `8432` by default; Mem0 connects to `postgres:5432`. Edit the left-side Compose port if occupied, keeping API `POSTGRES_PORT=5432`.
+- Data persists in `postgres_db`; container recreation preserves it. `docker compose down -v` deletes the volume's data.
+- Editing `.env` or Compose does not change passwords, create databases, or enable extensions in an initialized volume. Match its settings or adjust them with SQL. Back up and migrate before changing PostgreSQL major versions.
+
+If an existing volume lacks the application database or extension, confirm its settings and rerun the idempotent script:
+
+```bash
+docker compose exec -T postgres bash /docker-entrypoint-initdb.d/init-db.sh
+```
+
+#### Method B: existing PostgreSQL on the host
+
+Use `server/docker-compose.host-db.yaml` alone. It starts only the API and dashboard, adds `host.docker.internal:host-gateway`, and has no PostgreSQL service or startup dependency.
+
+Connect as an administrator and run only statements for roles and databases that do not exist:
 
 ```sql
 CREATE ROLE mem0 LOGIN PASSWORD 'REPLACE_WITH_DB_PASSWORD';
@@ -50,54 +102,122 @@ CREATE DATABASE mem0_app OWNER mem0;
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-`mem0` stores vector memories. `mem0_app` stores accounts, API keys, and saved configuration. The application user must be able to create tables and indexes in these databases.
-
-When PostgreSQL runs on the Docker host, use `POSTGRES_HOST=host.docker.internal`. PostgreSQL must listen on an address reachable from containers, and `pg_hba.conf` must allow the actual Docker subnet. A loopback-only listener is not reachable through the Docker host gateway.
-
-### 3. Edit `server/.env`
+The role needs permissions for tables, indexes, and migrations. Put actual values in `.env`:
 
 ```dotenv
-DASHSCOPE_API_KEY=YOUR_DASHSCOPE_API_KEY
-DASHSCOPE_BASE_URL=https://YOUR_WORKSPACE.cn-beijing.maas.aliyuncs.com/api/v1
-
-MEM0_DEFAULT_LLM_PROVIDER=dashscope
-MEM0_DEFAULT_EMBEDDER_PROVIDER=dashscope
-MEM0_DEFAULT_LLM_MODEL=qwen3.6-flash
-MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
-MEM0_RERANK_ENABLED=true
-MEM0_RERANK_MODEL=qwen3.7-text-rerank
-
 POSTGRES_HOST=host.docker.internal
-POSTGRES_PORT=5432
-POSTGRES_DB=mem0
 POSTGRES_USER=mem0
 POSTGRES_PASSWORD=REPLACE_WITH_DB_PASSWORD
-POSTGRES_COLLECTION_NAME=memories
-APP_DB_NAME=mem0_app
-
-JWT_SECRET=REPLACE_WITH_RANDOM_SECRET
-AUTH_DISABLED=false
-MEM0_TELEMETRY=false
-
-DASHBOARD_URL=http://localhost:3000
-PUBLIC_API_URL=http://localhost:8888
-MEM0_DASHBOARD_PORT=3000
-MEM0_API_PORT=8888
 ```
 
-Generate a value for `JWT_SECRET` with `openssl rand -hex 48` and paste the result into `.env`.
+Set API `POSTGRES_PORT=5432`, `POSTGRES_DB=mem0`, `POSTGRES_COLLECTION_NAME=memories`, and `APP_DB_NAME=mem0_app` directly in the host-database Compose file to match the existing instance. This method has no database container. Editing `.env` does not change the actual database password.
 
-The DashScope base URL accepts a host root, `/api/v1`, or `/compatible-mode/v1`; the provider chooses the appropriate endpoint for each model. Use the key and URL belonging to the same workspace and region.
+Container `localhost` means the container itself. Configure the existing PostgreSQL server to accept container connections:
 
-For remote access, replace both public URLs with addresses reachable from the browser. `DASHBOARD_URL` must exactly match the dashboard origin, including scheme and port, because it also controls CORS. Behind Nginx, use the external URLs here; the Docker host ports can remain unchanged.
+1. Locate configuration with `SHOW config_file;` and `SHOW hba_file;`.
+2. Set `listen_addresses` to a reachable host address. If using `'*'`, restrict firewall and `pg_hba.conf` access. Loopback-only listening is not reachable through the host gateway.
+3. Allow the actual source subnet for both databases, replacing `DOCKER_SUBNET` with its CIDR:
+
+```text
+host  mem0      mem0  DOCKER_SUBNET  scram-sha-256
+host  mem0_app  mem0  DOCKER_SUBNET  scram-sha-256
+```
+
+Inspect the network after creation. Docker Desktop may apply additional NAT; use the source address PostgreSQL actually sees:
+
+```bash
+docker network inspect mem0-dev_mem0_network \
+  --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+```
+
+Restart PostgreSQL for listener changes; authentication-rule-only changes can use `SELECT pg_reload_conf();` as an administrator.
+
+Before switching methods, ensure `.env` selects the intended host. Switching does not migrate memories, accounts, or saved configuration. Back up first and avoid `down -v` when retaining data.
+
+### 3. Where settings belong
+
+| Location | Settings | How to edit |
+| --- | --- | --- |
+| `.env` | Database credentials, API keys, JWT secret, real database/workspace endpoints, public API/dashboard URLs | Supply actual values without committing them. Compose retains safe fallback addresses; matching non-empty `.env` values take precedence. |
+| Selected Compose file | Images, ports, database/collection names, models/providers, reranking, telemetry, retention, and internal service addresses | Edit fixed values directly; these do not support `.env` overrides. |
+
+Example `server/.env`:
+
+```dotenv
+POSTGRES_HOST=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=REPLACE_WITH_DB_PASSWORD
+DASHSCOPE_API_KEY=YOUR_DASHSCOPE_API_KEY
+DASHSCOPE_BASE_URL=https://YOUR_WORKSPACE.cn-beijing.maas.aliyuncs.com/api/v1
+OPENAI_API_KEY=
+ADMIN_API_KEY=
+JWT_SECRET=REPLACE_WITH_RANDOM_SECRET
+DASHBOARD_URL=http://localhost:3000
+PUBLIC_API_URL=http://localhost:8888
+```
+
+For a host database, change `POSTGRES_HOST` and credentials. Generate `JWT_SECRET` with `openssl rand -hex 48`. The DashScope key and endpoint must match workspace and region; host roots, `/api/v1`, and `/compatible-mode/v1` are supported.
+
+Only deployment addresses use `${VARIABLE:-safe-default}`; ordinary settings use fixed values:
+
+```yaml
+services:
+  mem0:
+    ports:
+      - "8888:8000"
+    environment:
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
+      - MEM0_DEFAULT_LLM_PROVIDER=dashscope
+      - MEM0_DEFAULT_LLM_MODEL=qwen3.8-flash
+      - MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
+      - MEM0_RERANK_ENABLED=false
+      - MEM0_RERANK_MODEL=qwen3.7-text-rerank
+      - AUTH_DISABLED=false
+      - MEM0_TELEMETRY=true
+      - REQUEST_LOG_RETENTION_DAYS=30
+  mem0-dashboard:
+    ports:
+      - "3000:3000"
+    environment:
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8888}
+      - API_INTERNAL_URL=http://mem0:8000
+      - NEXT_PUBLIC_INSTANCE_NAME=Mem0
+```
+
+This is an excerpt; retain the rest of the file. Unset or empty addresses use fallbacks. `${VARIABLE:?message}` requires credentials. Standard Compose precedence still applies: matching shell exports override `.env`.
+
+For remote access or Nginx, put actual `DASHBOARD_URL` and `PUBLIC_API_URL` in `.env`. The first is the public dashboard origin shared by API and Web, matching browser scheme, host, and port. The second supplies Web's `NEXT_PUBLIC_API_URL`. Do not copy actual addresses into tracked Compose files or documentation.
+
+Change host ports on the left side of Compose `ports` mappings; normally keep container ports unchanged. Reverse proxy public ports may differ. Keep the internal `API_INTERNAL_URL=http://mem0:8000` fixed in Compose.
+
+Move old non-sensitive `.env` settings such as `MEM0_API_PORT`, `MEM0_DASHBOARD_PORT`, `POSTGRES_HOST_PORT`, `POSTGRES_IMAGE`, database names, models, and feature flags into the selected Compose file, then remove them from `.env`. They no longer override fixed Compose values. To retain enabled reranking, for example, set `MEM0_RERANK_ENABLED=true` directly in Compose rather than `.env`.
 
 ### 4. Build and start
 
-From `server/`:
+Finish real addresses and credentials in `.env`, and ordinary settings in Compose, then run from `server/`.
+
+Method A (default): optionally pull the database image first, then start all three services:
 
 ```bash
-docker compose build mem0 mem0-dashboard
-docker compose up -d
+docker compose pull postgres
+docker compose up -d --build
+```
+
+The upstream `make up` workflow also works with the default service ports. The database initializes automatically on its first startup.
+
+Method B (existing host database): use only the standalone file; it does not pull or start a PostgreSQL container:
+
+```bash
+docker compose -f docker-compose.host-db.yaml up -d --build
+```
+
+Keep specifying that file for Method B logs, updates, and shutdown:
+
+```bash
+docker compose -f docker-compose.host-db.yaml logs -f --tail=100 mem0
+docker compose -f docker-compose.host-db.yaml down
 ```
 
 | Service | Default local URL |
@@ -189,6 +309,9 @@ Set extraction rules through the administrator-only `POST /configure` endpoint:
 `custom_instructions` is a top-level setting. A write request's `prompt` overrides it for that request. With `infer=false`, messages are stored directly and extraction instructions do not apply. Changing instructions does not rewrite existing memories.
 
 ## Updating and operating the deployment
+
+The commands below use the default configuration. For Method B, add
+`-f docker-compose.host-db.yaml` after `docker compose`.
 
 After updating this fork's source, rebuild the API and dashboard:
 

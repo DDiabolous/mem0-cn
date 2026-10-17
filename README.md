@@ -12,9 +12,9 @@
 - **原生重排接口**：支持 `qwen3.7-text-rerank`，设置调用超时，失败时回退到原检索顺序。
 - **Web 模型配置**：可选择 provider、填写模型名、覆盖 API Key，以及配置或关闭重排。DashScope 的 Base URL 在服务端配置。
 - **中英文界面切换**：右上角开关临时切换中英文；设置／外观中可保存语言偏好，默认跟随系统。
-- **用户和设备区分**：可约定 `user_id` 为用户 ID、`agent_id` 为设备 ID，写入和查询都传入两个标识。
+
 - **复用 PostgreSQL + pgvector**：连接已有数据库，当前服务端默认使用 1024 维向量。
-- **个人配置分离**：外部地址、宿主机端口、模型密钥和数据库配置存放在 `.env`，Git 与 Docker 构建排除本地环境文件和运行历史。
+- **部署信息分离**：账号、密码、密钥及真实服务地址放在 `.env`；仅这些信息支持安全默认值和 `.env` 覆盖。端口、镜像、模型及开关等普通配置直接放在 Compose。
 - **Python 国内源**：服务端 Dockerfile 使用清华 PyPI 镜像；Docker 基础镜像仍从所配置的镜像仓库获取。
 
 当前新增适配集中在阿里云百炼，不代表已完成所有国产模型、数据库、操作系统或硬件平台的兼容验证。
@@ -22,10 +22,10 @@
 ## 环境要求
 
 - Docker Engine 或 Docker Desktop，以及 Docker Compose。
-- 已安装 pgvector 的 PostgreSQL 实例。
+- PostgreSQL + pgvector：默认由 Compose 启动，也可复用现有实例。
 - 阿里云百炼 API Key，以及对应业务空间、地域的接口地址。
 
-当前 Compose 只启动 Mem0 API 和 Web 管理界面，**不会自动创建 PostgreSQL 服务**。
+默认 Compose 与上游一样启动 Mem0 API、PostgreSQL 和 Web 管理界面。连接宿主机现有数据库使用独立的 `server/docker-compose.host-db.yaml`，两种方式见下文。
 
 ## 快速部署
 
@@ -37,9 +37,61 @@ cd mem0-cn/server
 cp .env.example .env
 ```
 
-### 2. 准备数据库
+### 2. 选择数据库方式（二选一）
 
-使用 PostgreSQL 管理员连接数据库。如果以下用户或数据库已经存在，跳过对应创建语句：
+| 项目            | 方式一：Compose 启动数据库（默认，与上游一致） | 方式二：连接宿主机现有数据库                                  |
+|-----------------|------------------------------------------------|---------------------------------------------------------------|
+| Compose 文件    | `docker-compose.yaml`                          | `docker-compose.host-db.yaml`                                 |
+| 启动服务        | API、PostgreSQL、Web                           | API、Web，不创建数据库容器                                    |
+| 启动命令        | `docker compose up -d --build`                 | `docker compose -f docker-compose.host-db.yaml up -d --build` |
+| `POSTGRES_HOST` | `postgres`（服务名）                           | `host.docker.internal`                                        |
+| `POSTGRES_PORT` | `5432`（数据库容器内部端口）                   | 现有 PostgreSQL 的监听端口                                    |
+| 数据位置        | Docker 命名卷 `postgres_db`                    | 现有 PostgreSQL 的数据目录                                    |
+| 数据库准备      | 首次启动自动建库并启用 vector                  | 管理员在现有实例中建库并启用 vector                           |
+
+真实数据库地址、账号和密码放在 `.env`，其中地址可覆盖 Compose 的安全默认值。数据库端口、数据库名和集合名是普通配置，直接修改所选 Compose。`POSTGRES_DB` 保存记忆和向量，`APP_DB_NAME` 保存账号、API Key 和运行配置。
+
+#### 方式一：默认 Compose，自动启动 PostgreSQL
+
+默认配置保持上游的三个服务、`postgres_db` 卷和初始化脚本结构。API 等待 PostgreSQL 健康后运行迁移，首次部署不需要手动建库。
+
+在 `server/.env` 中设置：
+
+```dotenv
+POSTGRES_HOST=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=REPLACE_WITH_NEW_DB_PASSWORD
+```
+
+镜像、共享内存和宿主机映射端口直接修改 Compose 固定值：
+
+```yaml
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    shm_size: 128mb
+    ports:
+      - "8432:5432"
+```
+
+以上是配置摘录，不替换整个文件。默认部署中，API 与 PostgreSQL 的 `POSTGRES_DB=postgres`、`APP_DB_NAME=mem0_app` 应同步修改。镜像包含 PostgreSQL 17 和 pgvector，无需另拉普通 `postgres` 镜像，见 [pgvector 官方说明](https://github.com/pgvector/pgvector#docker)。账号和密码必须在 `.env` 中填写，Compose 不保存真实凭据。
+
+- 首次启动空卷时，镜像创建 `POSTGRES_USER` 和 `POSTGRES_DB`；`init-db.sh` 根据 `APP_DB_NAME` 创建应用数据库，并在记忆数据库中启用 vector。
+- 宿主机工具默认连接 `8432`，Mem0 容器连接 `postgres:5432`。若宿主机端口被占用，修改 Compose 端口映射左侧数字，API 的 `POSTGRES_PORT=5432` 保持不变。
+- 数据保存在 `postgres_db`，重建容器不会清空；`docker compose down -v` 会删除该卷中的数据。
+- 已初始化的卷不会因修改 `.env` 或 Compose 而自动改密码、重新建库或启用扩展。保持配置与卷一致，必要时通过 SQL 调整。不要把其他 PostgreSQL 大版本的数据目录直接挂到 PostgreSQL 17，需先备份和迁移。
+
+已有卷缺少应用数据库或扩展时，确认连接信息后可重复执行初始化脚本：
+
+```bash
+docker compose exec -T postgres bash /docker-entrypoint-initdb.d/init-db.sh
+```
+
+#### 方式二：复用宿主机现有 PostgreSQL
+
+使用独立的 `server/docker-compose.host-db.yaml`。该配置仅启动 API 和 Web，带有 `host.docker.internal:host-gateway` 映射，没有 PostgreSQL 服务或启动依赖。
+
+以管理员身份连接已有数据库，仅执行尚未创建的用户和数据库语句：
 
 ```sql
 CREATE ROLE mem0 LOGIN PASSWORD 'REPLACE_WITH_DB_PASSWORD';
@@ -50,66 +102,122 @@ CREATE DATABASE mem0_app OWNER mem0;
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-- `mem0`：保存记忆、向量及元数据。
-- `mem0_app`：保存管理账号、API Key 和运行配置。
-
-应用数据库用户需要具备创建表、索引及运行迁移的权限。`vector` 扩展必须在实际存储记忆的数据库中启用。
-
-如果 PostgreSQL 运行在 Docker 宿主机，设置 `POSTGRES_HOST=host.docker.internal`。PostgreSQL 需要监听容器可访问的地址，并在 `pg_hba.conf` 中允许实际 Docker 网段连接；仅监听本机回环地址时，容器无法通过宿主机网关连接。
-
-### 3. 编辑 `server/.env`
+应用角色需要创建表、索引和运行迁移的权限。在 `.env` 填写实际值：
 
 ```dotenv
-DASHSCOPE_API_KEY=YOUR_DASHSCOPE_API_KEY
-DASHSCOPE_BASE_URL=https://YOUR_WORKSPACE.cn-beijing.maas.aliyuncs.com/api/v1
-
-MEM0_DEFAULT_LLM_PROVIDER=dashscope
-MEM0_DEFAULT_EMBEDDER_PROVIDER=dashscope
-MEM0_DEFAULT_LLM_MODEL=qwen3.6-flash
-MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
-MEM0_RERANK_ENABLED=true
-MEM0_RERANK_MODEL=qwen3.7-text-rerank
-
 POSTGRES_HOST=host.docker.internal
-POSTGRES_PORT=5432
-POSTGRES_DB=mem0
 POSTGRES_USER=mem0
 POSTGRES_PASSWORD=REPLACE_WITH_DB_PASSWORD
-POSTGRES_COLLECTION_NAME=memories
-APP_DB_NAME=mem0_app
-
-JWT_SECRET=REPLACE_WITH_RANDOM_SECRET
-AUTH_DISABLED=false
-MEM0_TELEMETRY=false
-
-DASHBOARD_URL=http://localhost:3000
-PUBLIC_API_URL=http://localhost:8888
-MEM0_DASHBOARD_PORT=3000
-MEM0_API_PORT=8888
 ```
 
-使用 `openssl rand -hex 48` 生成随机字符串，填入 `JWT_SECRET`。替换示例中的密钥、密码和 `YOUR_WORKSPACE`，API Key 与地址需要属于同一业务空间及地域。
+API 的 `POSTGRES_PORT=5432`、`POSTGRES_DB=mem0`、`POSTGRES_COLLECTION_NAME=memories` 和 `APP_DB_NAME=mem0_app` 直接在宿主机数据库 Compose 文件中按实际情况修改。此方式没有数据库容器配置。修改 `.env` 不会修改数据库的实际密码。
 
-`DASHSCOPE_BASE_URL` 支持主机根地址、`/api/v1` 或 `/compatible-mode/v1`，provider 会为不同模型自动选择对应接口。
+容器中的 `localhost` 是容器本身，宿主机 PostgreSQL 还需允许容器连接：
 
-远程访问时，两个公开 URL 应改成浏览器实际可访问的地址：
+1. 用 `SHOW config_file;`、`SHOW hba_file;` 找到实际配置文件。
+2. 将 `postgresql.conf` 的 `listen_addresses` 设为容器可访问的地址；使用 `'*'` 时，配合防火墙和 `pg_hba.conf` 限制范围。仅监听 `127.0.0.1` 无法通过宿主机网关连接。
+3. 在 `pg_hba.conf` 允许实际容器来源网段访问两个数据库。将下面的 `DOCKER_SUBNET` 替换为实际 CIDR：
 
-| 配置项 | 用途 |
-| --- | --- |
-| `DASHBOARD_URL` | 浏览器访问管理界面的源地址，同时用于 CORS 校验，协议、主机和端口必须匹配。 |
-| `PUBLIC_API_URL` | 浏览器请求 Mem0 API 的地址。 |
-| `MEM0_DASHBOARD_PORT` | Web 容器映射到宿主机的端口。 |
-| `MEM0_API_PORT` | API 容器映射到宿主机的端口。 |
+```text
+host  mem0      mem0  DOCKER_SUBNET  scram-sha-256
+host  mem0_app  mem0  DOCKER_SUBNET  scram-sha-256
+```
 
-使用 Nginx 时，公开 URL 填反向代理后的地址，宿主机端口可保持原值。远程浏览器中的 `localhost` 指访问者自己的电脑，不能用它代替服务器地址。
+网络创建后可查询网段；Docker Desktop 可能有额外 NAT，应以 PostgreSQL 实际看到的来源地址为准：
+
+```bash
+docker network inspect mem0-dev_mem0_network \
+  --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+```
+
+修改监听地址后重启 PostgreSQL；只改认证规则时，可由管理员执行 `SELECT pg_reload_conf();`。
+
+切换部署方式前，确认 `.env` 中数据库地址与所选方式一致。两种方式不会自动迁移彼此的记忆、账号和配置，应先备份，且不要用 `down -v` 清理原数据。
+
+### 3. 配置存放规则
+
+| 存放位置          | 配置内容                                                                                      | 修改方式                                     |
+|-------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------|
+| `.env`            | 数据库账号/密码、API Key、JWT Secret、实际数据库地址、模型业务空间地址、API/Web 公开地址      | 修改 Compose 或 .env 中的对应值，.env 优先   |
+| 所选 Compose 文件 | 镜像、端口、数据库名、集合名、模型/provider、重排、遥测、日志保留天数、内部服务地址等通用配置 | 直接修改 Compose 中的值                      |
+
+`server/.env` 示例：
+
+```dotenv
+POSTGRES_HOST=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=REPLACE_WITH_DB_PASSWORD
+DASHSCOPE_API_KEY=YOUR_DASHSCOPE_API_KEY
+DASHSCOPE_BASE_URL=https://YOUR_WORKSPACE.cn-beijing.maas.aliyuncs.com/api/v1
+OPENAI_API_KEY=
+ADMIN_API_KEY=
+JWT_SECRET=REPLACE_WITH_RANDOM_SECRET
+DASHBOARD_URL=http://localhost:3000
+PUBLIC_API_URL=http://localhost:8888
+```
+
+连接宿主机数据库时，修改 `POSTGRES_HOST` 和账号密码。用 `openssl rand -hex 48` 生成 `JWT_SECRET`。百炼地址和 API Key 应属于同一业务空间及地域；地址支持主机根地址、`/api/v1` 和 `/compatible-mode/v1`。
+
+只有实际地址等部署信息使用 `${变量名:-安全默认值}`。普通参数直接写固定值，例如：
+
+```yaml
+services:
+  mem0:
+    ports:
+      - "8888:8000"
+    environment:
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
+      - MEM0_DEFAULT_LLM_PROVIDER=dashscope
+      - MEM0_DEFAULT_LLM_MODEL=qwen3.8-flash
+      - MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
+      - MEM0_RERANK_ENABLED=false
+      - MEM0_RERANK_MODEL=qwen3.7-text-rerank
+      - AUTH_DISABLED=false
+      - MEM0_TELEMETRY=true
+      - REQUEST_LOG_RETENTION_DAYS=30
+  mem0-dashboard:
+    ports:
+      - "3000:3000"
+    environment:
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8888}
+      - API_INTERNAL_URL=http://mem0:8000
+      - NEXT_PUBLIC_INSTANCE_NAME=Mem0
+```
+
+以上是配置摘录，保留文件中其余内容。地址未设置或为空时使用安全默认值；账号密码使用 `${变量名:?提示}`，必须填写。运行命令所在 Shell 的同名环境变量按 Compose 标准规则优先于 `.env`。
+
+远程访问或使用 Nginx 时，在 `.env` 中设置 `DASHBOARD_URL` 和 `PUBLIC_API_URL`。前者是 Web 的公开源地址，API 和 Web 共用，需与浏览器的协议、主机和端口一致；后者自动注入 Web 的 `NEXT_PUBLIC_API_URL`。真实地址不要复制到 Compose 或文档。
+
+端口直接修改 Compose 的 `ports` 左侧数字，右侧容器端口通常不变；反向代理公开端口可以与宿主机端口不同。内部地址 `API_INTERNAL_URL=http://mem0:8000` 保持 Compose 固定值。
+
+旧 `.env` 中若仍有 `MEM0_API_PORT`、`MEM0_DASHBOARD_PORT`、`POSTGRES_HOST_PORT`、`POSTGRES_IMAGE`、数据库名或模型/功能开关，请将这些非敏感设置迁入所选 Compose 后从 `.env` 删除。它们不再覆盖固定的 Compose 配置。例如要保留重排启用状态，应在 Compose 中将 `MEM0_RERANK_ENABLED` 改为 `true`，而不是继续写在 `.env`。
 
 ### 4. 构建并启动
 
-在 `server/` 目录执行：
+完成 `.env` 中的真实地址和凭据，并按需修改 Compose 普通配置后，在 `server/` 目录执行。
+
+方式一（默认）：可先单独拉取数据库镜像，再按上游习惯启动全部三个服务：
 
 ```bash
-docker compose build mem0 mem0-dashboard
-docker compose up -d
+docker compose pull postgres
+docker compose up -d --build
+```
+
+也可使用上游的 `make up` 启动流程（默认服务端口）。数据库首次初始化由容器自动完成。
+
+方式二（连接宿主机数据库）：只使用独立文件，不会拉取或启动 PostgreSQL 容器：
+
+```bash
+docker compose -f docker-compose.host-db.yaml up -d --build
+```
+
+后续查看日志、更新或停止方式二的部署时，仍需指定 `-f docker-compose.host-db.yaml`：
+
+```bash
+docker compose -f docker-compose.host-db.yaml logs -f --tail=100 mem0
+docker compose -f docker-compose.host-db.yaml down
 ```
 
 默认本机访问地址：
@@ -206,6 +314,9 @@ curl -sS http://localhost:8888/search \
 
 ## 更新与运维
 
+下面命令适用于默认方式；连接宿主机数据库时，在 `docker compose` 后加上
+`-f docker-compose.host-db.yaml`。
+
 更新本仓库代码后，重新构建两个服务：
 
 ```bash
@@ -217,7 +328,7 @@ docker compose logs -f --tail=100 mem0
 
 API 使用 `server/dev.Dockerfile`，以仓库根目录为构建上下文，将本地修改的 SDK 安装到 `/opt/mem0`。Web 使用单独的 Dockerfile，前端修改也需要重新构建。当前 Compose 使用 Uvicorn 热重载模式，正式部署时需按运行环境调整。
 
-不要提交 `.env`、API Key、密码、数据库备份及 `server/history/`。个人配置不会随 Git 推送，服务器上的 `.env` 需要单独维护。备份应包含 PostgreSQL 和历史目录；更换 Embedding 模型或维度时，需要检查集合兼容性，并按需重新向量化旧数据。
+不要提交 `.env`、API Key、密码、数据库备份及 `server/history/`。真实部署信息不会随 Git 推送，服务器上的 `.env` 需要单独维护；Compose 中保留可提交的通用默认值。备份应包含 PostgreSQL 和历史目录；更换 Embedding 模型或维度时，需要检查集合兼容性，并按需重新向量化旧数据。
 
 ## 文档与上游
 

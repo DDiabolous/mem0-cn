@@ -44,7 +44,7 @@ const emptyModel: ModelForm = {
   apiKey: "",
 };
 const dashscopeModels = {
-  llm: "qwen3.6-flash",
+  llm: "qwen3.8-flash",
   embedder: "qwen3.7-text-embedding-flash",
   reranker: "qwen3.7-text-rerank",
 };

@@ -2,13 +2,11 @@ name: mem0-dev
 
 services:
   mem0:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     build:
       context: ..
       dockerfile: server/dev.Dockerfile
     ports:
-      - "${MEM0_API_PORT:-8888}:8000"
+      - "8888:8000"
     env_file:
       - .env
     networks:
@@ -16,6 +14,9 @@ services:
     volumes:
       - ./history:/app/history
       - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: >
       sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
@@ -23,15 +24,51 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=
       - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
-      - APP_DB_NAME=${APP_DB_NAME:-mem0_app}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=mem0
+      - POSTGRES_USER=${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - POSTGRES_COLLECTION_NAME=memories
+      - APP_DB_NAME=mem0_app
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
+      - MEM0_DEFAULT_LLM_PROVIDER=dashscope
+      - MEM0_DEFAULT_EMBEDDER_PROVIDER=dashscope
+      - MEM0_DEFAULT_LLM_MODEL=qwen3.8-flash
+      - MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
+      - MEM0_RERANK_ENABLED=false
+      - MEM0_RERANK_MODEL=qwen3.7-text-rerank
+      - REQUEST_LOG_RETENTION_DAYS=30
       - JWT_SECRET=${JWT_SECRET}
-      - AUTH_DISABLED=${AUTH_DISABLED:-false}
-      - MEM0_TELEMETRY=${MEM0_TELEMETRY:-true}
+      - AUTH_DISABLED=false
+      - MEM0_TELEMETRY=true
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: on-failure
+    shm_size: 128mb
+    networks:
+      - mem0_network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      APP_DB_NAME: mem0_app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -h 127.0.0.1 -d \"$$POSTGRES_DB\" -U \"$$POSTGRES_USER\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    ports:
+      - "8432:5432"
 
   mem0-dashboard:
     build: ./dashboard
     ports:
-      - "${MEM0_DASHBOARD_PORT:-3000}:3000"
+      - "3000:3000"
     networks:
       - mem0_network
     environment:

@@ -29,7 +29,7 @@ def test_llm_uses_dashscope_credentials_and_json_mode():
         client.return_value.chat.completions.create.return_value = SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content='{"memory": []}'))],
         )
-        llm = LlmFactory.create("dashscope", {"model": "qwen3.6-flash"})
+        llm = LlmFactory.create("dashscope", {"model": "qwen3.8-flash"})
         assert (
             llm.generate_response([{"role": "user", "content": "你好"}], response_format={"type": "json_object"})
             == '{"memory": []}'
@@ -108,9 +108,9 @@ def test_provider_switch_drops_incompatible_config():
 
     merged = _merge_config(
         {"llm": {"provider": "openai", "config": {"api_key": "old", "openai_base_url": "old", "model": "old"}}},
-        {"llm": {"provider": "dashscope", "config": {"model": "qwen3.6-flash"}}},
+        {"llm": {"provider": "dashscope", "config": {"model": "qwen3.8-flash"}}},
     )
-    assert merged["llm"]["config"] == {"model": "qwen3.6-flash"}
+    assert merged["llm"]["config"] == {"model": "qwen3.8-flash"}
 
 
 def test_invalid_config_does_not_replace_running_config(monkeypatch):

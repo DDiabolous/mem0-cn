@@ -1,15 +1,18 @@
 # Mem0 Self-Hosted Server
 
 For this fork's current deployment workflow, start with the root
-[English README](../README.md) or [中文 README](../README.zh-CN.md).
-The current Compose file connects to an existing PostgreSQL instance; it does not
-start its own database. The sections below retain upstream operational and
-historical migration notes and should be read with that deployment difference in mind.
+[English README](../README.en.md) or [中文 README](../README.md).
+The default `docker-compose.yaml` starts PostgreSQL + pgvector, the API, and the
+dashboard, matching upstream. Use the standalone `docker-compose.host-db.yaml`
+instead to connect to an existing PostgreSQL instance on the host.
+The root READMEs cover both methods, their environment settings, database
+initialization, and startup commands. The sections below retain upstream
+operational and historical migration notes.
 
 Mem0 ships a self-hosted FastAPI server plus a local dashboard. It is secure by default, supports dashboard login and API keys, and exposes OpenAPI docs at `/docs`.
 
 For Alibaba Cloud chat, embeddings, and reranking, see [DashScope Models](../docs/integrations/dashscope-rerank.mdx).
-Set `DASHSCOPE_API_KEY` and `DASHSCOPE_BASE_URL`, then select `dashscope` on the dashboard Configuration page.
+Put `DASHSCOPE_API_KEY` and the actual `DASHSCOPE_BASE_URL` in `.env`, then select `dashscope` on the dashboard Configuration page.
 The page supports configuring or disabling a reranker. Rebuild both API and dashboard images after updating code.
 `POST /search` accepts `rerank: true`, `candidate_k` (retrieval depth), and `top_k` (final result count).
 
@@ -28,25 +31,39 @@ Copy the example env file and set a Postgres password (required):
 ```bash
 cd server
 cp .env.example .env
-# Edit .env — configure the existing database, JWT_SECRET, and model credentials.
+# Edit .env — set credentials, database connection details, workspace and public URLs.
+# Only real addresses and credentials use .env. Edit generic settings directly in Compose.
 ```
 
-Keep deployment-specific values in the ignored `server/.env`, and commit only
-placeholders or local defaults in `.env.example`:
+Keep credentials and actual service addresses in the ignored `server/.env`:
 
 ```dotenv
+POSTGRES_HOST=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=REPLACE_WITH_DB_PASSWORD
+DASHSCOPE_API_KEY=YOUR_DASHSCOPE_API_KEY
+DASHSCOPE_BASE_URL=https://YOUR_WORKSPACE.cn-beijing.maas.aliyuncs.com/api/v1
+ADMIN_API_KEY=
+JWT_SECRET=REPLACE_WITH_RANDOM_SECRET
 DASHBOARD_URL=http://localhost:3000
 PUBLIC_API_URL=http://localhost:8888
-MEM0_DASHBOARD_PORT=3000
-MEM0_API_PORT=8888
 ```
 
-`DASHBOARD_URL` is the browser-facing dashboard origin and CORS origin.
-`PUBLIC_API_URL` is the API URL reachable from the browser. Set both to your own
-external addresses when using a reverse proxy. `MEM0_*_PORT` controls Docker host
-port mappings; container ports remain 3000 and 8000. Database and model credentials
-also belong in `.env`. Git and Docker build contexts exclude local environment
-files and runtime history. Recreate containers after editing environment values.
+Only these settings use interpolation. Real addresses override safe fallbacks via
+`${VARIABLE:-safe-default}`; credentials use `.env` and required-value checks.
+Non-empty `.env` values override those fallback addresses, subject to standard
+Compose shell-variable precedence.
+
+Edit ordinary settings directly in the selected Compose file: port mappings,
+database names/ports, model providers/names, images, reranking, telemetry, retention,
+and internal service addresses. They use fixed values, not `.env` overrides.
+`DASHBOARD_URL` supplies both API and Web. `PUBLIC_API_URL` supplies Web's
+`NEXT_PUBLIC_API_URL`. Keep `API_INTERNAL_URL=http://mem0:8000` in Compose.
+
+Move legacy ordinary settings from `.env` into Compose if needed; for example,
+retain enabled reranking by setting `MEM0_RERANK_ENABLED=true` in Compose.
+Do not copy actual IPs, workspace URLs, or credentials into tracked files.
+Recreate services after configuration changes.
 
 ### Agent-first
 
@@ -142,7 +159,7 @@ Once logged in, the dashboard exposes:
 - **Memories** — browse memories, filter by user ID.
 - **Entities** — list every `user_id`, `agent_id`, and `run_id` that owns memories, with counts. Delete an entity to cascade-delete its memories.
 - **API Keys** — create, label, and revoke per-user keys.
-- **Configuration** — runtime LLM and embedder override. Changes persist to the app database and reapply on restart, layered over the values from your `.env`.
+- **Configuration** — runtime LLM and embedder override. Changes persist to the app database and reapply on restart, layered over the Compose environment defaults and private credentials from `.env`.
 - **Settings** — account profile and password.
 
 ## Telemetry
@@ -228,14 +245,13 @@ docker compose down -v
 The Postgres credentials are no longer hardcoded in `docker-compose.yaml`.
 Add them to your `.env` file (or verify they match your old setup):
 
-```bash
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-POSTGRES_DB=postgres
+```dotenv
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=<your-password>    # required — compose will refuse to start without it
-POSTGRES_COLLECTION_NAME=memories
+POSTGRES_PASSWORD=REPLACE_WITH_DB_PASSWORD
 ```
+
+Set the actual `POSTGRES_HOST` in `.env`. Edit `POSTGRES_PORT`, `POSTGRES_DB`,
+and `POSTGRES_COLLECTION_NAME` directly in the selected Compose file.
 
 If you previously relied on the hardcoded defaults (`postgres`/`postgres`), set
 `POSTGRES_PASSWORD=postgres` to keep the same credentials.

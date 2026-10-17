@@ -25,7 +25,7 @@ from mem0 import Memory
 config = {
     "llm": {
         "provider": "dashscope",
-        "config": {"model": "qwen3.6-flash", "temperature": 0.1},
+        "config": {"model": "qwen3.8-flash", "temperature": 0.1},
     },
     "embedder": {
         "provider": "dashscope",
@@ -67,7 +67,7 @@ embeddings. You can explicitly select defaults with:
 ```dotenv
 MEM0_DEFAULT_LLM_PROVIDER=dashscope
 MEM0_DEFAULT_EMBEDDER_PROVIDER=dashscope
-MEM0_DEFAULT_LLM_MODEL=qwen3.6-flash
+MEM0_DEFAULT_LLM_MODEL=qwen3.8-flash
 MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
 MEM0_RERANK_ENABLED=true
 MEM0_RERANK_MODEL=qwen3.7-text-rerank

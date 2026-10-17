@@ -36,7 +36,7 @@ def test_default_models_follow_provider_with_only_shared_credentials(monkeypatch
     exec(compile(ast.Module(body=nodes, type_ignores=[]), "server/main.py", "exec"), values)
     assert values["DEFAULT_LLM_PROVIDER"] == values["DEFAULT_EMBEDDER_PROVIDER"] == expected
     if expected == "dashscope":
-        assert values["DEFAULT_LLM_MODEL"] == "qwen3.6-flash"
+        assert values["DEFAULT_LLM_MODEL"] == "qwen3.8-flash"
         assert values["DEFAULT_EMBEDDER_MODEL"] == "qwen3.7-text-embedding-flash"
     else:
         assert values["DEFAULT_LLM_MODEL"] == "gpt-5-mini"
@@ -101,7 +101,7 @@ def test_dashboard_can_discover_all_dashscope_providers(config_client):
 def test_dashboard_saves_and_disables_reranker_without_leaking_keys(config_client):
     client, saved = config_client
     config = {
-        "llm": {"provider": "dashscope", "config": {"model": "qwen3.6-flash"}},
+        "llm": {"provider": "dashscope", "config": {"model": "qwen3.8-flash"}},
         "embedder": {"provider": "dashscope", "config": {"model": "qwen3.7-text-embedding-flash"}},
         "reranker": {"provider": "dashscope", "config": {"model": "qwen3.7-text-rerank", "api_key": "new-key"}},
     }

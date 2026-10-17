@@ -24,7 +24,7 @@ test("DashScope model saves without overwriting a stored secret", () => {
 test("DashScope keeps credential overrides but uses the server base URL", () => {
   const payload = buildProviderConfig({
     provider: "dashscope",
-    model: "qwen3.6-flash",
+    model: "qwen3.8-flash",
     apiKey: "new-key",
   });
   assert.equal(payload.config.api_key, "new-key");

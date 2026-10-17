@@ -1,0 +1,69 @@
+# Existing PostgreSQL on the Docker host. Run with:
+# docker compose -f docker-compose.host-db.yaml up -d --build
+name: mem0-dev
+
+services:
+  mem0:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    build:
+      context: ..
+      dockerfile: server/dev.Dockerfile
+    ports:
+      - "8888:8000"
+    env_file:
+      - .env
+    networks:
+      - mem0_network
+    volumes:
+      - ./history:/app/history
+      - .:/app
+    command: >
+      sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
+      - POSTGRES_HOST=${POSTGRES_HOST:-host.docker.internal}
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=mem0
+      - POSTGRES_USER=${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - POSTGRES_COLLECTION_NAME=memories
+      - APP_DB_NAME=mem0_app
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
+      - MEM0_DEFAULT_LLM_PROVIDER=dashscope
+      - MEM0_DEFAULT_EMBEDDER_PROVIDER=dashscope
+      - MEM0_DEFAULT_LLM_MODEL=qwen3.8-flash
+      - MEM0_DEFAULT_EMBEDDER_MODEL=qwen3.7-text-embedding-flash
+      - MEM0_RERANK_ENABLED=true
+      - MEM0_RERANK_MODEL=qwen3.7-text-rerank
+      - REQUEST_LOG_RETENTION_DAYS=30
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_DISABLED=false
+      - MEM0_TELEMETRY=true
+
+  mem0-dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:3000"
+    networks:
+      - mem0_network
+    environment:
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8888}
+      - API_INTERNAL_URL=http://mem0:8000
+      - NEXT_PUBLIC_INSTANCE_NAME=Mem0
+    depends_on:
+      mem0:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  mem0_network:
+    driver: bridge
